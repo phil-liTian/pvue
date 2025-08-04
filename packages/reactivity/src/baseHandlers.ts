@@ -3,19 +3,24 @@
  * @Date: 2025-08-01 20:35:18
  */
 // =============== reactive ===============
-import { isObject } from '@pvue/shared'
+import { hasChanged, hasOwn, isArray, isObject, isSymbol } from '@pvue/shared'
 import { ReactiveFlags, TrackOpTypes, TriggerOpTypes } from './constants'
-import { Target, reactive, reactiveMap } from './reactive'
+import { Target, reactive, reactiveMap, readonly, toRaw } from './reactive'
 import { track, trigger } from './dep'
 
 class BaseReactiveHandler implements ProxyHandler<Target> {
-  constructor(_isReadonly = false, protected _isShallow = false) {}
+  constructor(protected _isReadonly = false, protected _isShallow = false) {}
 
   get(target: Target, key, receiver) {
     const shallow = this._isShallow
+    const isReadonly = this._isReadonly
 
     if (key === ReactiveFlags.IS_REACTIVE) {
       return true
+    } else if (key === ReactiveFlags.IS_SHALLOW) {
+      return shallow
+    } else if (key === ReactiveFlags.IS_READONLY) {
+      return isReadonly
     } else if (key === ReactiveFlags.RAW) {
       // .RAW的对象就是reactive对象时，raw才是target, 否则raw是null
       //  如果一个对象的原型上有raw 而不是本身的raw 则 raw的target不存在
@@ -25,8 +30,6 @@ class BaseReactiveHandler implements ProxyHandler<Target> {
         Object.getPrototypeOf(target) === Object.getPrototypeOf(receiver)
       ) {
         return target
-      } else if (key === ReactiveFlags.IS_SHALLOW) {
-        return shallow
       }
 
       return
@@ -37,10 +40,30 @@ class BaseReactiveHandler implements ProxyHandler<Target> {
     track(target, TrackOpTypes.GET, key)
 
     if (isObject(res)) {
-      return reactive(res)
+      return isReadonly ? readonly(res) : reactive(res)
     }
 
     return res
+  }
+
+  deleteProperty(target: Target, key: string | symbol): boolean {
+    const hadKey = hasOwn(target, key)
+    const result = Reflect.deleteProperty(target, key)
+    if (result && hadKey) {
+      // 删除操作触发更新
+      trigger(target, TriggerOpTypes.DELETE, key)
+    }
+    return result
+  }
+
+  has(target: Target, key: string | symbol): boolean {
+    const result = Reflect.has(target, key)
+    if (!isSymbol(key)) {
+      // 操作in进行依赖收集
+      track(target, TrackOpTypes.HAS, key)
+    }
+
+    return result
   }
 }
 
@@ -50,9 +73,37 @@ class MutableReactiveHandler extends BaseReactiveHandler {
   }
 
   set(target: Target, key, value, receiver) {
-    trigger(target, TriggerOpTypes.SET, key)
+    let oldValue = target[key]
+    // 先改变对象的value
+    value = toRaw(value)
 
-    return Reflect.set(target, key, value, receiver)
+    const hadKey = isArray(target)
+      ? Number(key) < target.length
+      : hasOwn(target, key)
+    // 再执行trigger就可以拿到变化后的值
+    const result = Reflect.set(target, key, value, receiver)
+
+    if (hadKey) {
+      if (hasChanged(value, oldValue)) {
+        // 修改已存在的属性
+        trigger(target, TriggerOpTypes.SET, key)
+      }
+    } else {
+      trigger(target, TriggerOpTypes.ADD, key)
+    }
+
+    return result
+  }
+}
+
+// readonly
+class ReadonlyReactiveHandler extends BaseReactiveHandler {
+  constructor(isShallow = false) {
+    super(true, isShallow)
+  }
+
+  set() {
+    return true
   }
 }
 
@@ -63,3 +114,7 @@ export const mutableHandlers = new MutableReactiveHandler()
 export const shallowMutableHandlers = new MutableReactiveHandler(true)
 
 // readonlyReactive
+export const readonlyHandlers = new ReadonlyReactiveHandler()
+
+// shallowReadonly
+export const shallowReadonlyHandlers = new ReadonlyReactiveHandler(true)

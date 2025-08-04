@@ -5,20 +5,31 @@
 
 import { extend, hasOwn } from '@pvue/shared'
 import { ReactiveFlags } from './constants'
-import { toRaw } from './reactive'
+import { toRaw, toReactive } from './reactive'
+
+type CollectionTypes = IterableCollections | WeakCollections
+type IterableCollections = Map<any, any> | Set<any>
+type WeakCollections = WeakMap<any, any> | Set<any>
+
+const getProto = <T extends CollectionTypes>(v: T): any =>
+  Reflect.getPrototypeOf(v)
 
 function createInstrumentations(readonly: boolean, shallow: boolean) {
   const instrumentations = {
     get(this, key: unknown) {
       const target = this[ReactiveFlags.RAW]
+      const rawTarget = toRaw(target)
 
-      console.log('key', key)
+      const { has } = getProto(rawTarget)
+      const wrap = toReactive
+      // set、map、weakSet、weakMap的value会自动转换成响应式对象
+      if (has.call(rawTarget, key)) {
+        return wrap(target.get(key))
+      }
 
       if (key === ReactiveFlags.IS_SHALLOW) {
         return shallow
       }
-
-      console.log('target', target)
 
       return target.get(key)
     },
@@ -32,7 +43,6 @@ function createInstrumentations(readonly: boolean, shallow: boolean) {
           set(this, key: unknown, value: unknown) {
             // console.log('this', this, key, value)
             const target = toRaw(this)
-            console.log('target', target)
             target.set(key, value)
           },
         }
@@ -70,4 +80,14 @@ export const mutableCollectionHandlers: ProxyHandler<any> = {
 // shallowReactive
 export const shallowCollectionHandlers: ProxyHandler<any> = {
   get: createInstrumentationGetter(false, true),
+}
+
+// readonly
+export const readonlyCollectionHandlers: ProxyHandler<any> = {
+  get: createInstrumentationGetter(true, false),
+}
+
+// shallowReadonly
+export const shallowReadonlyCollectionHandlers: ProxyHandler<any> = {
+  get: createInstrumentationGetter(true, true),
 }

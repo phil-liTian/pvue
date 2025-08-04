@@ -1,9 +1,16 @@
-import { def, toRawType } from '@pvue/shared'
+import { def, hasOwn, isObject, toRawType } from '@pvue/shared'
 import { ReactiveFlags } from './constants'
-import { mutableHandlers, shallowMutableHandlers } from './baseHandlers'
+import {
+  mutableHandlers,
+  readonlyHandlers,
+  shallowMutableHandlers,
+  shallowReadonlyHandlers,
+} from './baseHandlers'
 import {
   mutableCollectionHandlers,
+  readonlyCollectionHandlers,
   shallowCollectionHandlers,
+  shallowReadonlyCollectionHandlers,
 } from './collectionHandlers'
 
 export const reactiveMap: WeakMap<Target, any> = new WeakMap<Target, any>()
@@ -11,10 +18,16 @@ export const shallowReactiveMap: WeakMap<Target, any> = new WeakMap<
   Target,
   any
 >()
+export const readonlyMap: WeakMap<Target, any> = new WeakMap<Target, any>()
+export const shallowReadonlyMap: WeakMap<Target, any> = new WeakMap<
+  Target,
+  any
+>()
 
 export interface Target {
   [ReactiveFlags.IS_REACTIVE]?: boolean
   [ReactiveFlags.RAW]?: boolean
+  [ReactiveFlags.IS_SHALLOW]?: boolean
 }
 
 export type Reactive<T> = {} & T
@@ -69,12 +82,42 @@ export function shallowReactive(target: Object) {
   )
 }
 
+// 只读
+export function readonly(target: Object) {
+  return createReactiveObject(
+    target,
+    true,
+    readonlyHandlers,
+    readonlyCollectionHandlers,
+    readonlyMap
+  )
+}
+
+// 只读 且 浅层监听
+export function shallowReadonly(target: Object) {
+  return createReactiveObject(
+    target,
+    true,
+    shallowReadonlyHandlers,
+    shallowReadonlyCollectionHandlers,
+    shallowReadonlyMap
+  )
+}
+
+export function toReactive<T extends unknown>(value: T) {
+  return isObject(value) ? reactive(value) : value
+}
+
 export function isReactive(value: unknown): boolean {
   return !!(value && (value as Target)[ReactiveFlags.IS_REACTIVE])
 }
 
 export function isShallow(value: unknown): boolean {
   return !!(value && (value as Target)[ReactiveFlags.IS_SHALLOW])
+}
+
+export function isReadonly(value: unknown): boolean {
+  return !!(value && (value as Target)[ReactiveFlags.IS_READONLY])
 }
 
 function createReactiveObject(
@@ -92,16 +135,16 @@ function createReactiveObject(
     return target
   }
 
+  const targetType = getTargetType(target)
+  // 对象里面有skip 则认为是无效target 不做响应式处理
+  if (targetType === TargetType.INVALID) {
+    return target
+  }
+
   // 如果多次将相同对象处理成响应式对象 则返回相同的代理对象,而不是新建一个代理对象
   const existingProxy = proxyMap.get(target)
   if (existingProxy) {
     return existingProxy
-  }
-
-  const targetType = getTargetType(target)
-
-  if (targetType === TargetType.INVALID) {
-    return target
   }
 
   // set、map、weakMap、weakSet 走collectionHandlers逻辑
@@ -122,7 +165,7 @@ export function toRaw<T>(observed: T): T {
 
 // 标记一个对象，使其永远不会被转换为响应式对象 。
 export function markRaw<T extends Object>(value: T): Raw<T> {
-  if (Object.isExtensible(value)) {
+  if (Object.isExtensible(value) && !hasOwn(value, ReactiveFlags.SKIP)) {
     // 可拓展
     def(value, ReactiveFlags.SKIP, true)
   }

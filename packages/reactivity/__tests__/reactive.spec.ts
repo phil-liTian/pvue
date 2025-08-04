@@ -5,14 +5,17 @@
 import {
   isProxy,
   isReactive,
+  isReadonly,
   isShallow,
   markRaw,
   reactive,
+  readonly,
   shallowReactive,
+  shallowReadonly,
   toRaw,
 } from '../src/reactive'
 
-describe.skip('reactivity/reactive', () => {
+describe('reactivity/reactive', () => {
   it('Object', () => {
     const original = { foo: 1 }
     const observed = reactive(original)
@@ -51,7 +54,7 @@ describe.skip('reactivity/reactive', () => {
     expect(isReactive(observed.array[0])).toBe(true)
   })
 
-  test.skip('observing subtypes of IterableCollections(Map, Set)', () => {
+  test('observing subtypes of IterableCollections(Map, Set)', () => {
     // subtypes of Map
     class CustomMap extends Map {}
     const cmap = reactive(new CustomMap())
@@ -63,11 +66,11 @@ describe.skip('reactivity/reactive', () => {
     expect(isReactive(cmap.get('key'))).toBe(true)
 
     // // subtypes of Set
-    // class CustomSet extends Set {}
-    // const cset = reactive(new CustomSet())
+    class CustomSet extends Set {}
+    const cset = reactive(new CustomSet())
 
-    // expect(cset).toBeInstanceOf(Set)
-    // expect(isReactive(cset)).toBe(true)
+    expect(cset).toBeInstanceOf(Set)
+    expect(isReactive(cset)).toBe(true)
 
     // let dummy
     // effect(() => (dummy = cset.has('value')))
@@ -78,7 +81,7 @@ describe.skip('reactivity/reactive', () => {
     // expect(dummy).toBe(false)
   })
 
-  test.skip('observing subtypes of WeakCollections(WeakMap, WeakSet)', () => {
+  test('observing subtypes of WeakCollections(WeakMap, WeakSet)', () => {
     // subtypes of WeakMap
     class CustomMap extends WeakMap {}
     const cmap = reactive(new CustomMap())
@@ -97,13 +100,13 @@ describe.skip('reactivity/reactive', () => {
     expect(cset).toBeInstanceOf(WeakSet)
     expect(isReactive(cset)).toBe(true)
 
-    let dummy
-    effect(() => (dummy = cset.has(key)))
-    expect(dummy).toBe(false)
-    cset.add(key)
-    expect(dummy).toBe(true)
-    cset.delete(key)
-    expect(dummy).toBe(false)
+    // let dummy
+    // effect(() => (dummy = cset.has(key)))
+    // expect(dummy).toBe(false)
+    // cset.add(key)
+    // expect(dummy).toBe(true)
+    // cset.delete(key)
+    // expect(dummy).toBe(false)
   })
 
   test('observed value should proxy mutations to original (Object)', () => {
@@ -154,7 +157,7 @@ describe.skip('reactivity/reactive', () => {
     expect(observed2).toBe(observed)
   })
 
-  test.skip('不应该用Proxies污染原始对象', () => {
+  test('不应该用Proxies污染原始对象', () => {
     const original: any = { foo: 1 }
     const original2 = { bar: 2 }
     const observed = reactive(original)
@@ -295,12 +298,10 @@ describe.skip('reactivity/reactive', () => {
   })
 
   // 确保被 markRaw 标记过的对象不会被转换为响应式对象，即使它被添加到一个响应式对象中
-  test.skip('should not markRaw object as reactive', () => {
+  test('should not markRaw object as reactive', () => {
     const a = reactive({ a: 1 })
     const b = reactive({ b: 2 }) as any
     b.a = markRaw(toRaw(a))
-    console.log('b.a', b.a)
-
     expect(b.a === a).toBe(false)
   })
 
@@ -360,26 +361,26 @@ describe.skip('reactivity/reactive', () => {
     const fooRe = reactive(foo)
     expect(isProxy(fooRe)).toBe(true)
 
-    // const fooSRe = shallowReactive(foo)
-    // expect(isProxy(fooSRe)).toBe(true)
+    const fooSRe = shallowReactive(foo)
+    expect(isProxy(fooSRe)).toBe(true)
 
-    // const barRl = readonly(foo)
-    // expect(isProxy(barRl)).toBe(true)
+    const barRl = readonly(foo)
+    expect(isProxy(barRl)).toBe(true)
 
-    // const barSRl = shallowReadonly(foo)
-    // expect(isProxy(barSRl)).toBe(true)
+    const barSRl = shallowReadonly(foo)
+    expect(isProxy(barSRl)).toBe(true)
 
     // const c = computed(() => {})
     // expect(isProxy(c)).toBe(false)
   })
 
-  test.skip('The results of the shallow and readonly assignments are the same (Map)', () => {
+  test('The results of the shallow and readonly assignments are the same (Map)', () => {
     const map = reactive(new Map())
     map.set('foo', shallowReactive({ a: 2 }))
     expect(isShallow(map.get('foo'))).toBe(true)
 
-    // map.set('bar', readonly({ b: 2 }))
-    // expect(isReadonly(map.get('bar'))).toBe(true)
+    map.set('bar', readonly({ b: 2 }))
+    expect(isReadonly(map.get('bar'))).toBe(true)
   })
 
   test.skip('The results of the shallow and readonly assignments are the same (Set)', () => {

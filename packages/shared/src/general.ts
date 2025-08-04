@@ -20,11 +20,22 @@ export const toRawType = (value: unknown): string => {
 
 const hasOwnProperty = Object.prototype.hasOwnProperty
 
-export const hasOwn = (val: Object, key: string) => {
+export const hasOwn = (val: Object, key: string | symbol) => {
   return hasOwnProperty.call(val, key)
 }
 
+export const isFunction = (value: unknown): value is Function => {
+  return typeof value === 'function'
+}
+
+export const isArray: typeof Array.isArray = Array.isArray
+
+export const isSymbol = (val: unknown): val is symbol => typeof val === 'symbol'
+
 export const extend: typeof Object.assign = Object.assign
+
+export const hasChanged = (value: any, oldValue: any): boolean =>
+  !Object.is(value, oldValue)
 
 // 给对象定义一个不可被枚举的属性
 export const def = (
