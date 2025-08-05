@@ -35,6 +35,8 @@ export function startBatch() {
 }
 
 export function endBatch() {
+  if (--batchDepth > 0) return
+
   while (batchedSub) {
     let e: Subscriber | undefined = batchedSub
     batchedSub = undefined
@@ -64,12 +66,19 @@ export class ReactiveEffect<T = any> implements Subscriber {
   constructor(public fn: () => T) {}
 
   run() {
+    // stop 之后的 fn 就不是active类型的, 这时如果再次触发trigger
+    if (!(this.flags & EffectFlags.ACTIVE)) {
+      return this.fn()
+    }
+
     // 这是需要收集的effect
+    this.flags |= EffectFlags.RUNNING
     activeSub = this
     try {
       this.fn()
     } finally {
       cleanupDeps(this)
+      this.flags &= ~EffectFlags.RUNNING
     }
   }
 
@@ -87,6 +96,10 @@ export class ReactiveEffect<T = any> implements Subscriber {
   }
 
   notify() {
+    if (this.flags & EffectFlags.RUNNING) {
+      return
+    }
+
     if (!(this.flags & EffectFlags.NOTIFIED)) {
       batch(this)
     }

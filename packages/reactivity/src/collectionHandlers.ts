@@ -4,8 +4,9 @@
  */
 
 import { extend, hasOwn } from '@pvue/shared'
-import { ReactiveFlags } from './constants'
+import { ReactiveFlags, TrackOpTypes, TriggerOpTypes } from './constants'
 import { toRaw, toReactive } from './reactive'
+import { track, trigger } from './dep'
 
 type CollectionTypes = IterableCollections | WeakCollections
 type IterableCollections = Map<any, any> | Set<any>
@@ -19,8 +20,11 @@ function createInstrumentations(readonly: boolean, shallow: boolean) {
     get(this, key: unknown) {
       const target = this[ReactiveFlags.RAW]
       const rawTarget = toRaw(target)
+      const rawKey = toRaw(key)
+      // track(rawTarget, TrackOpTypes.GET, rawKey)
 
       const { has } = getProto(rawTarget)
+
       const wrap = toReactive
       // set、map、weakSet、weakMap的value会自动转换成响应式对象
       if (has.call(rawTarget, key)) {
@@ -31,7 +35,9 @@ function createInstrumentations(readonly: boolean, shallow: boolean) {
         return shallow
       }
 
-      return target.get(key)
+      const res = target.get(key)
+
+      return res
     },
   }
 
@@ -44,6 +50,9 @@ function createInstrumentations(readonly: boolean, shallow: boolean) {
             // console.log('this', this, key, value)
             const target = toRaw(this)
             target.set(key, value)
+            trigger(target, TriggerOpTypes.SET, key, value)
+
+            return this
           },
         }
   )

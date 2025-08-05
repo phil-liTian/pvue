@@ -1,6 +1,12 @@
 import { vitest } from 'vitest'
-import { effect, stop } from '../src/effect'
-import { reactive, toRaw } from '../src/reactive'
+import { effect, endBatch, startBatch, stop } from '../src/effect'
+import {
+  markRaw,
+  reactive,
+  readonly,
+  shallowReactive,
+  toRaw,
+} from '../src/reactive'
 
 describe('reactivity/effect', () => {
   it('should run the passed function once (wrapped by a effect)', () => {
@@ -176,7 +182,7 @@ describe('reactivity/effect', () => {
     expect(dummy).toBe('World!')
   })
 
-  it.skip('should observe implicit array length changes', () => {
+  it('should observe implicit array length changes', () => {
     let dummy
     const list = reactive(['Hello'])
     effect(() => (dummy = list.join(' ')))
@@ -188,7 +194,7 @@ describe('reactivity/effect', () => {
     expect(dummy).toBe('Hello World!  Hello!')
   })
 
-  it.skip('should observe sparse array mutations', () => {
+  it('should observe sparse array mutations', () => {
     let dummy
     const list = reactive<string[]>([])
     list[1] = 'World!'
@@ -201,7 +207,7 @@ describe('reactivity/effect', () => {
     expect(dummy).toBe('Hello')
   })
 
-  it.skip('should observe enumeration', () => {
+  it('should observe enumeration', () => {
     let dummy = 0
     const numbers = reactive<Record<string, number>>({ num1: 3 })
     effect(() => {
@@ -218,7 +224,7 @@ describe('reactivity/effect', () => {
     expect(dummy).toBe(4)
   })
 
-  it.skip('should observe symbol keyed properties', () => {
+  it('should observe symbol keyed properties', () => {
     const key = Symbol('symbol keyed prop')
     let dummy, hasDummy
     const obj = reactive<{ [key]?: string }>({ [key]: 'value' })
@@ -234,7 +240,7 @@ describe('reactivity/effect', () => {
     expect(hasDummy).toBe(false)
   })
 
-  it.skip('should not observe well-known symbol keyed properties', () => {
+  it('should not observe well-known symbol keyed properties', () => {
     const key = Symbol.isConcatSpreadable
     let dummy
     const array: any = reactive([])
@@ -263,7 +269,7 @@ describe('reactivity/effect', () => {
     expect(spy).toHaveBeenCalledTimes(1)
   })
 
-  it.skip('should support manipulating an array while observing symbol keyed properties', () => {
+  it('should support manipulating an array while observing symbol keyed properties', () => {
     const key = Symbol()
     let dummy
     const array: any = reactive([1, 2, 3])
@@ -360,7 +366,7 @@ describe('reactivity/effect', () => {
     expect(dummy).toBe(undefined)
   })
 
-  it.skip('should not be triggered by inherited raw setters', () => {
+  it('should not be triggered by inherited raw setters', () => {
     let dummy, parentDummy, hiddenValue: any
     const obj = reactive<{ prop?: number }>({})
     const parent = reactive({
@@ -382,17 +388,19 @@ describe('reactivity/effect', () => {
     expect(parentDummy).toBe(undefined)
   })
 
-  it.skip('should avoid implicit infinite recursive loops with itself', () => {
+  it('should avoid implicit infinite recursive loops with itself', () => {
     const counter = reactive({ num: 0 })
     // 如何避免死循环？
     const counterSpy = vitest.fn(() => counter.num++)
     effect(counterSpy)
     expect(counter.num).toBe(1)
     expect(counterSpy).toHaveBeenCalledTimes(1)
-    // counter.num = 4
-    // expect(counter.num).toBe(5)
-    // expect(counterSpy).toHaveBeenCalledTimes(2)
+    counter.num = 4
+    expect(counter.num).toBe(5)
+    expect(counterSpy).toHaveBeenCalledTimes(2)
   })
+
+  // TODO
 
   it('stop', () => {
     let dummy
@@ -444,5 +452,185 @@ describe('reactivity/effect', () => {
 
     stop(runner)
     expect(onStop).toHaveBeenCalled()
+  })
+
+  it('stop: a stopped effect is nested in a normal effect', () => {
+    let dummy
+    const obj = reactive({ prop: 1 })
+    const runner = effect(() => {
+      dummy = obj.prop
+    })
+    stop(runner)
+    obj.prop = 2
+    expect(dummy).toBe(1)
+
+    // observed value in inner stopped effect
+    // will track outer effect as an dependency
+    effect(() => {
+      runner()
+    })
+    expect(dummy).toBe(2)
+
+    // notify outer effect to run
+    obj.prop = 3
+    expect(dummy).toBe(3)
+  })
+
+  it('markRaw', () => {
+    const obj = reactive({
+      foo: markRaw({
+        prop: 0,
+      }),
+    })
+    let dummy
+    effect(() => {
+      dummy = obj.foo.prop
+    })
+    expect(dummy).toBe(0)
+    obj.foo.prop++
+    expect(dummy).toBe(0)
+    obj.foo = { prop: 1 }
+    expect(dummy).toBe(1)
+  })
+
+  it('should not be triggered when the value and the old value both are NaN', () => {
+    const obj = reactive({
+      foo: NaN,
+    })
+    const fnSpy = vitest.fn(() => obj.foo)
+    effect(fnSpy)
+    obj.foo = NaN
+    expect(fnSpy).toHaveBeenCalledTimes(1)
+  })
+
+  it('should trigger all effects when array length is set to 0', () => {
+    const observed: any = reactive([1])
+    let dummy, record
+    effect(() => {
+      dummy = observed.length
+    })
+    effect(() => {
+      record = observed[0]
+    })
+    expect(dummy).toBe(1)
+    expect(record).toBe(1)
+
+    observed[1] = 2
+    expect(observed[1]).toBe(2)
+
+    observed.unshift(3)
+    expect(dummy).toBe(3)
+    expect(record).toBe(3)
+
+    observed.length = 0
+    expect(dummy).toBe(0)
+    expect(record).toBeUndefined()
+  })
+
+  it('should not be triggered when set with the same proxy', () => {
+    const obj = reactive({ foo: 1 })
+    const observed: any = reactive({ obj })
+    const fnSpy = vitest.fn(() => observed.obj)
+
+    effect(fnSpy)
+
+    expect(fnSpy).toHaveBeenCalledTimes(1)
+    // observed.obj = obj
+    // expect(fnSpy).toHaveBeenCalledTimes(1)
+
+    const obj2 = reactive({ foo: 1 })
+    const observed2: any = shallowReactive({ obj2 })
+    const fnSpy2 = vitest.fn(() => observed2.obj2)
+
+    effect(fnSpy2)
+
+    expect(fnSpy2).toHaveBeenCalledTimes(1)
+    observed2.obj2 = obj2
+    expect(fnSpy2).toHaveBeenCalledTimes(1)
+  })
+
+  it('should be triggered when set length with string', () => {
+    let ret1 = 'idle'
+    let ret2 = 'idle'
+    const arr1 = reactive(new Array(11).fill(0))
+    const arr2 = reactive(new Array(11).fill(0))
+    effect(() => {
+      ret1 = arr1[10] === undefined ? 'arr[10] is set to empty' : 'idle'
+    })
+    effect(() => {
+      ret2 = arr2[10] === undefined ? 'arr[10] is set to empty' : 'idle'
+    })
+    arr1.length = 2
+    arr2.length = '2' as any
+    expect(ret1).toBe(ret2)
+  })
+
+  describe('readonly + reactive for Map', () => {
+    test.skip('should work with readonly(reactive(Map))', () => {
+      const m = reactive(new Map())
+      const roM = readonly(m)
+      const fnSpy = vitest.fn(() => roM.get(1))
+
+      effect(fnSpy)
+      expect(fnSpy).toHaveBeenCalledTimes(1)
+      m.set(1, 1)
+      expect(fnSpy).toHaveBeenCalledTimes(2)
+    })
+
+    test.skip('should work with observed value as key', () => {
+      const key = reactive({})
+      const m = reactive(new Map())
+      m.set(key, 1)
+      const roM = readonly(m)
+      const fnSpy = vitest.fn(() => roM.get(key))
+
+      effect(fnSpy)
+      expect(fnSpy).toHaveBeenCalledTimes(1)
+      m.set(key, 1)
+      expect(fnSpy).toHaveBeenCalledTimes(1)
+      m.set(key, 2)
+      expect(fnSpy).toHaveBeenCalledTimes(2)
+    })
+
+    test('should track hasOwnProperty', () => {
+      const obj: any = reactive({})
+      let has = false
+      const fnSpy = vitest.fn()
+
+      effect(() => {
+        fnSpy()
+        has = obj.hasOwnProperty('foo')
+      })
+      expect(fnSpy).toHaveBeenCalledTimes(1)
+      expect(has).toBe(false)
+
+      obj.foo = 1
+      expect(fnSpy).toHaveBeenCalledTimes(2)
+      expect(has).toBe(true)
+
+      delete obj.foo
+      expect(fnSpy).toHaveBeenCalledTimes(3)
+      expect(has).toBe(false)
+
+      // // should not trigger on unrelated key
+      obj.bar = 2
+      expect(fnSpy).toHaveBeenCalledTimes(3)
+      expect(has).toBe(false)
+    })
+  })
+
+  it('should be triggered once with batching', () => {
+    const counter = reactive({ num: 0 })
+
+    const counterSpy = vitest.fn(() => counter.num)
+    effect(counterSpy)
+
+    counterSpy.mockClear()
+
+    startBatch()
+    counter.num++
+    counter.num++
+    endBatch()
+    expect(counterSpy).toHaveBeenCalledTimes(1)
   })
 })

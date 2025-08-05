@@ -3,22 +3,40 @@
  * @Date: 2025-08-01 20:35:18
  */
 // =============== reactive ===============
-import { hasChanged, hasOwn, isArray, isObject, isSymbol } from '@pvue/shared'
+import {
+  hasChanged,
+  hasOwn,
+  isArray,
+  isIntegerKey,
+  isObject,
+  isSymbol,
+  makeMap,
+} from '@pvue/shared'
 import { ReactiveFlags, TrackOpTypes, TriggerOpTypes } from './constants'
 import { Target, reactive, reactiveMap, readonly, toRaw } from './reactive'
-import { track, trigger } from './dep'
+import { ITERATE_KEY, track, trigger } from './dep'
+import { arrayInstrumentations } from './arrayInstrumentations'
+
+const isNonTrackableKeys = makeMap('__proto__,__v_isRef,__isVue')
+// 内置的symbol集合
+export const builtInSymbols = new Set(
+  Object.getOwnPropertyNames(Symbol)
+    .filter(key => key !== 'arguments' && key !== 'caller')
+    .map(key => Symbol[key])
+    .filter(isSymbol)
+)
 
 class BaseReactiveHandler implements ProxyHandler<Target> {
   constructor(protected _isReadonly = false, protected _isShallow = false) {}
 
   get(target: Target, key, receiver) {
-    const shallow = this._isShallow
+    const isShallow = this._isShallow
     const isReadonly = this._isReadonly
 
     if (key === ReactiveFlags.IS_REACTIVE) {
       return true
     } else if (key === ReactiveFlags.IS_SHALLOW) {
-      return shallow
+      return isShallow
     } else if (key === ReactiveFlags.IS_READONLY) {
       return isReadonly
     } else if (key === ReactiveFlags.RAW) {
@@ -35,9 +53,33 @@ class BaseReactiveHandler implements ProxyHandler<Target> {
       return
     }
 
+    // 对array进行单独处理
+    const targetIsArray = isArray(target)
+    if (!isReadonly) {
+      let fn: Function | undefined
+      if (targetIsArray && (fn = arrayInstrumentations[key])) {
+        return fn
+      }
+
+      // should track hasOwnProperty
+      // 跟踪hasOwnProperty: 如果effect里面是hasOwnProperty, 当setter改属性时，会派发更新
+      if (key === 'hasOwnProperty') {
+        return hasOwnProperty
+      }
+    }
+
     const res = Reflect.get(target, key, receiver)
 
+    // 如果是symbol内置的key,或者系统定义的不需要依赖收集的key 则不做依赖收集
+    if (isSymbol(key) ? builtInSymbols.has(key) : isNonTrackableKeys(key)) {
+      return res
+    }
+
     track(target, TrackOpTypes.GET, key)
+
+    if (isShallow) {
+      return res
+    }
 
     if (isObject(res)) {
       return isReadonly ? readonly(res) : reactive(res)
@@ -58,12 +100,19 @@ class BaseReactiveHandler implements ProxyHandler<Target> {
 
   has(target: Target, key: string | symbol): boolean {
     const result = Reflect.has(target, key)
-    if (!isSymbol(key)) {
+    // 不是symbol类型的key 或者不是
+    if (!isSymbol(key) || !builtInSymbols.has(key)) {
       // 操作in进行依赖收集
       track(target, TrackOpTypes.HAS, key)
     }
 
     return result
+  }
+
+  ownKeys(target: Record<string | symbol, unknown>): (string | symbol)[] {
+    track(target, TrackOpTypes.ITERATE, ITERATE_KEY)
+
+    return Reflect.ownKeys(target)
   }
 }
 
@@ -75,25 +124,36 @@ class MutableReactiveHandler extends BaseReactiveHandler {
   set(target: Target, key, value, receiver) {
     let oldValue = target[key]
     // 先改变对象的value
-    value = toRaw(value)
+    if (!this._isShallow) {
+      value = toRaw(value)
+    }
 
-    const hadKey = isArray(target)
-      ? Number(key) < target.length
-      : hasOwn(target, key)
+    const hadKey =
+      isArray(target) && isIntegerKey(key)
+        ? Number(key) < target.length
+        : hasOwn(target, key)
     // 再执行trigger就可以拿到变化后的值
     const result = Reflect.set(target, key, value, receiver)
-
-    if (hadKey) {
-      if (hasChanged(value, oldValue)) {
-        // 修改已存在的属性
-        trigger(target, TriggerOpTypes.SET, key)
+    // 如果触发的key是对象原型上的key, 而非自身的key，则无需派发更新
+    if (target === toRaw(receiver)) {
+      if (hadKey) {
+        if (hasChanged(value, oldValue)) {
+          // 修改已存在的属性
+          trigger(target, TriggerOpTypes.SET, key, value, oldValue)
+        }
+      } else {
+        trigger(target, TriggerOpTypes.ADD, key, value)
       }
-    } else {
-      trigger(target, TriggerOpTypes.ADD, key)
     }
 
     return result
   }
+}
+
+function hasOwnProperty(this: object, key: unknown) {
+  const obj = toRaw(this)
+  track(obj, TrackOpTypes.HAS, key)
+  return obj.hasOwnProperty(key as string)
 }
 
 // readonly

@@ -9,6 +9,7 @@ export enum ReactiveFlags {
 export enum TrackOpTypes {
   GET = 'get',
   HAS = 'has',
+  ITERATE = 'iterate',
 }
 
 export enum TriggerOpTypes {

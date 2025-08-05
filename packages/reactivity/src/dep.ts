@@ -1,8 +1,18 @@
+import { isArray, isIntegerKey, isSymbol } from '@pvue/shared'
 import { TrackOpTypes, TriggerOpTypes } from './constants'
-import { activeSub, EffectFlags, endBatch, type Subscriber } from './effect'
+import {
+  activeSub,
+  EffectFlags,
+  endBatch,
+  startBatch,
+  type Subscriber,
+} from './effect'
 
 type KeyToDepMap = Map<any, any>
 const targetMap: WeakMap<object, KeyToDepMap> = new WeakMap()
+
+export const ARRAY_ITERATE_KEY: unique symbol = Symbol('Array iterate')
+export const ITERATE_KEY: unique symbol = Symbol('Object iterate')
 
 export class Link {
   version: number
@@ -52,7 +62,7 @@ export class Dep {
 
   notify() {
     // this.subs.forEach(effect => effect.run())
-
+    startBatch()
     try {
       for (let link = this.subs; link; link = link.prevSub) {
         if (link.sub.notify()) {
@@ -63,9 +73,9 @@ export class Dep {
     }
   }
 
-  clear() {
-    // this.subs.length = 0
-  }
+  // clear() {
+  //   this.subs.length = 0
+  // }
 }
 
 function addSub(link: Link) {
@@ -97,7 +107,13 @@ export function track(target: Object, type: TrackOpTypes, key: unknown) {
   dep.track()
 }
 
-export function trigger(target: Object, type: TriggerOpTypes, key: unknown) {
+export function trigger(
+  target: Object,
+  type: TriggerOpTypes,
+  key?: unknown,
+  newValue?: unknown,
+  oldValue?: unknown
+) {
   const depsMap = targetMap.get(target)
   if (!depsMap) {
     return
@@ -110,5 +126,48 @@ export function trigger(target: Object, type: TriggerOpTypes, key: unknown) {
     }
   }
 
-  run(dep)
+  startBatch()
+  const targetIsArray = isArray(target)
+  const isArrayIndex = targetIsArray && isIntegerKey(key)
+
+  // 如果直接修改 array的length属性, 则直接触发 depsMap中收集的key对应的dep
+  if (targetIsArray && key === 'length') {
+    const newLength = Number(newValue)
+    depsMap.forEach((dep, key) => {
+      if (key === 'length' || (!isSymbol(key) && key >= newLength)) {
+        run(dep)
+      }
+    })
+  } else {
+    if (isArrayIndex) {
+      run(depsMap.get(ARRAY_ITERATE_KEY))
+    }
+  }
+
+  if (key != void 0) {
+    // target如果是array, 这里的dep是undefined, 不会执行
+    run(dep)
+  }
+
+  switch (type) {
+    case TriggerOpTypes.ADD: {
+      if (!targetIsArray) {
+        run(depsMap.get(ITERATE_KEY))
+      } else if (isArrayIndex) {
+        run(depsMap.get('length'))
+      }
+      break
+    }
+
+    case TriggerOpTypes.DELETE: {
+      // if (!targetIsArray) {
+      //   run(depsMap.get(ITERATE_KEY))
+      // }
+    }
+    default: {
+    }
+  }
+
+  // 处理array
+  endBatch()
 }

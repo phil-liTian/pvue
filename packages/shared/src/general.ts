@@ -28,9 +28,20 @@ export const isFunction = (value: unknown): value is Function => {
   return typeof value === 'function'
 }
 
+export const isString = (val: unknown): val is string => typeof val === 'string'
+
 export const isArray: typeof Array.isArray = Array.isArray
 
 export const isSymbol = (val: unknown): val is symbol => typeof val === 'symbol'
+
+export const isIntegerKey = (key: unknown): boolean => {
+  return (
+    isString(key) &&
+    key !== 'NaN' &&
+    key[0] !== '-' &&
+    '' + parseInt(key, 10) === key
+  )
+}
 
 export const extend: typeof Object.assign = Object.assign
 
