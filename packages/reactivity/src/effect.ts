@@ -144,8 +144,6 @@ function cleanupDeps(sub: Subscriber) {
   while (link) {
     const prev = link.prevDep
 
-    //
-
     link.dep.activeLink = link.prevActiveLink
     link.prevActiveLink = undefined
 

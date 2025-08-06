@@ -8,4 +8,21 @@ export {
   type Reactive,
 } from './reactive'
 
-export { effect } from './effect'
+export { effect, ReactiveEffect } from './effect'
+
+export {
+  ref,
+  shallowRef,
+  unref,
+  triggerRef,
+  customRef,
+  isRef,
+  toRef,
+  toRefs,
+  toValue,
+  type Ref,
+  type ShallowRef,
+  type ToRef,
+  type MaybeRef,
+  type MaybeRefOrGetter,
+} from './ref'

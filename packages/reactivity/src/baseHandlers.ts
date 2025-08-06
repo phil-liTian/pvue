@@ -16,6 +16,7 @@ import { ReactiveFlags, TrackOpTypes, TriggerOpTypes } from './constants'
 import { Target, reactive, reactiveMap, readonly, toRaw } from './reactive'
 import { ITERATE_KEY, track, trigger } from './dep'
 import { arrayInstrumentations } from './arrayInstrumentations'
+import { isRef } from './ref'
 
 const isNonTrackableKeys = makeMap('__proto__,__v_isRef,__isVue')
 // 内置的symbol集合
@@ -68,7 +69,8 @@ class BaseReactiveHandler implements ProxyHandler<Target> {
       }
     }
 
-    const res = Reflect.get(target, key, receiver)
+    // ref wrapped in reactive should not track internal _value access
+    const res = Reflect.get(target, key, isRef(target) ? target : receiver)
 
     // 如果是symbol内置的key,或者系统定义的不需要依赖收集的key 则不做依赖收集
     if (isSymbol(key) ? builtInSymbols.has(key) : isNonTrackableKeys(key)) {
@@ -79,6 +81,13 @@ class BaseReactiveHandler implements ProxyHandler<Target> {
 
     if (isShallow) {
       return res
+    }
+
+    // reactive 里面对象元素的value是ref类型 get时直接获取其value
+    if (isRef(res)) {
+      // test: should NOT unwrap ref types nested inside arrays
+      // 如果获取数组的元素是ref类型, 则照常返回ref类型, 否则返回ref的value
+      return targetIsArray && isIntegerKey(key) ? res : res.value
     }
 
     if (isObject(res)) {
@@ -126,6 +135,13 @@ class MutableReactiveHandler extends BaseReactiveHandler {
     // 先改变对象的value
     if (!this._isShallow) {
       value = toRaw(value)
+
+      // test: should work like a normal property when nested in a reactive object
+      // 新的value不是ref, old是ref类型的 可以直接通过改变oldValue的value属性 触发ref的trigger
+      if (!isArray(target) && !isRef(value) && isRef(oldValue)) {
+        oldValue.value = value
+        return true
+      }
     }
 
     const hadKey =
@@ -133,7 +149,13 @@ class MutableReactiveHandler extends BaseReactiveHandler {
         ? Number(key) < target.length
         : hasOwn(target, key)
     // 再执行trigger就可以拿到变化后的值
-    const result = Reflect.set(target, key, value, receiver)
+    // ref wrapped in reactive should not track internal _value access
+    const result = Reflect.set(
+      target,
+      key,
+      value,
+      isRef(target) ? target : receiver
+    )
     // 如果触发的key是对象原型上的key, 而非自身的key，则无需派发更新
     if (target === toRaw(receiver)) {
       if (hadKey) {
