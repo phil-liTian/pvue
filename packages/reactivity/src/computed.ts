@@ -1,3 +1,7 @@
+/*
+ * @Author: phil
+ * @Date: 2025-08-03 23:10:20
+ */
 import { isFunction } from '@pvue/shared'
 
 export class ComputedRefImpl<T> {
@@ -22,7 +26,6 @@ export function computed<T>(getterOrOptions) {
   if (isFunction(getterOrOptions)) {
     getter = getterOrOptions
   }
-  // console.log('getter', getter())
 
   return new ComputedRefImpl(getter)
 }

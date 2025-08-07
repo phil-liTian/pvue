@@ -1,5 +1,6 @@
 import { extend } from '@pvue/shared'
 import { Dep, Link } from './dep'
+import { activeEffectScope } from './effectScope'
 
 export let activeSub
 let batchedSub: Subscriber | undefined
@@ -63,7 +64,11 @@ export class ReactiveEffect<T = any> implements Subscriber {
   next: any
   onStop?: () => void
 
-  constructor(public fn: () => T) {}
+  constructor(public fn: () => T) {
+    if (activeEffectScope && activeEffectScope.active) {
+      activeEffectScope.effects.push(this)
+    }
+  }
 
   run() {
     // stop 之后的 fn 就不是active类型的, 这时如果再次触发trigger
