@@ -12,6 +12,6 @@ describe('reactivity/computed', () => {
     const cValue = computed(() => value.foo)
     expect(cValue.value).toBe(undefined)
     value.foo = 1
-    // expect(cValue.value).toBe(1)
+    expect(cValue.value).toBe(1)
   })
 })

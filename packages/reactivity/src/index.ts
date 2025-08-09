@@ -41,6 +41,8 @@ export {
   type MaybeRefOrGetter,
 } from './ref'
 
+export { ReactiveFlags } from './constants'
+
 export { computed } from './computed'
 
-export { watch } from './watch'
+export { watch, onWatcherCleanup, type WatchOptions } from './watch'

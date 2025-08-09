@@ -2,6 +2,10 @@
  * @Author: phil
  * @Date: 2025-08-01 20:57:43
  */
+
+export const EMPTY_OBJ = {}
+export const NOOP = (): void => {}
+
 export const isObject = (val: unknown): val is Record<any, any> => {
   return val !== null && typeof val === 'object'
 }
@@ -16,6 +20,10 @@ export const toTypeString = (value: unknown): string =>
 export const toRawType = (value: unknown): string => {
   // extract "RawType" from strings like "[object RawType]"
   return toTypeString(value).slice(8, -1)
+}
+
+export const isPlainObject = (val: unknown): val is object => {
+  return toRawType(val) === 'Object'
 }
 
 const hasOwnProperty = Object.prototype.hasOwnProperty

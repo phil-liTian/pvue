@@ -1,7 +1,9 @@
 import { extend } from '@pvue/shared'
 import { Dep, Link } from './dep'
 import { activeEffectScope } from './effectScope'
+import { ComputedRefImpl } from './computed'
 
+export type EffectScheduler = (...args: any[]) => any
 export let activeSub
 let batchedSub: Subscriber | undefined
 let batchDepth = 0
@@ -62,6 +64,8 @@ export class ReactiveEffect<T = any> implements Subscriber {
   // 表尾
   depsTail?: Link = undefined
   next: any
+  scheduler?: EffectScheduler = undefined
+
   onStop?: () => void
 
   constructor(public fn: () => T) {
@@ -111,17 +115,27 @@ export class ReactiveEffect<T = any> implements Subscriber {
   }
 
   trigger() {
-    this.run()
+    if (this.scheduler) {
+      this.scheduler()
+    } else {
+      this.run()
+    }
   }
 }
 
 export interface ReactiveEffectOptions {
   onStop?: () => void
+  scheduler?: EffectScheduler
 }
 
 export interface ReactiveEffectRunner<T = any> {
   (): T
   effect: ReactiveEffect
+}
+
+export function refreshComputed(computed: ComputedRefImpl) {
+  const value = computed.fn()
+  computed._value = value
 }
 
 export function effect<T = any>(fn: () => T, options?: ReactiveEffectOptions) {
