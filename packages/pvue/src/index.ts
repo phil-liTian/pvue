@@ -1,1 +1,1 @@
-export * from '@pvue/runtime-core'
+export * from '@pvue/runtime-dom'

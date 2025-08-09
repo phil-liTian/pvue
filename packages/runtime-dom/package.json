@@ -1,6 +1,7 @@
 {
-  "name": "pvue",
+  "name": "@pvue/runtime-dom",
   "version": "1.0.0",
+  "description": "",
   "main": "index.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1"
@@ -8,9 +9,7 @@
   "keywords": [],
   "author": "",
   "license": "ISC",
-  "description": "",
   "devDependencies": {
-    "@pvue/runtime-core": "workspace:*",
-    "@pvue/runtime-dom": "workspace:*"
+    "@pvue/runtime-core": "workspace:*"
   }
 }
