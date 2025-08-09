@@ -43,6 +43,8 @@ export {
 
 export { ReactiveFlags } from './constants'
 
+export { warn } from './warning'
+
 export { computed } from './computed'
 
 export { watch, onWatcherCleanup, type WatchOptions } from './watch'

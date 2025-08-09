@@ -5,3 +5,6 @@
 export * from './general'
 export * from './makeMap'
 export * from './typeUtils'
+export * from './shapeFlags'
+export * from './patchFlags'
+export * from './normalizeProp'

@@ -8,6 +8,9 @@ importers:
 
   .:
     dependencies:
+      rollup:
+        specifier: ^4.46.2
+        version: 4.46.2
       vitest:
         specifier: ^3.1.4
         version: 3.1.4(@types/node@24.1.0)
@@ -25,6 +28,12 @@ importers:
         specifier: ^8.38.0
         version: 8.38.0(eslint@9.32.0)(typescript@5.8.3)
 
+  packages/pvue:
+    devDependencies:
+      '@pvue/runtime-core':
+        specifier: workspace:*
+        version: link:../runtime-core
+
   packages/reactivity:
     devDependencies:
       '@pvue/shared':
@@ -36,6 +45,9 @@ importers:
       '@pvue/reactivity':
         specifier: workspace:*
         version: link:../reactivity
+      '@pvue/shared':
+        specifier: workspace:*
+        version: link:../shared
 
   packages/shared: {}
 
