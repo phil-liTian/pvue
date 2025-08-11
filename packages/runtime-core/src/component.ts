@@ -10,8 +10,12 @@ export type Data = Record<string, unknown>
 
 export type Component = ComponentOptions & {}
 
-export interface CompoentInternalInstance {
+export type ConcreteComponent = any
+
+export interface ComponentInternalInstance {
   vnode: VNode
+  type: ConcreteComponent
+  render?: Function
 }
 
 export class ClassComponent {
@@ -20,13 +24,38 @@ export class ClassComponent {
 
 export function createComponentInstance(
   vnode: VNode,
-  parent: CompoentInternalInstance | null
-): CompoentInternalInstance {
-  const instance: CompoentInternalInstance = {
+  parent?: ComponentInternalInstance | null
+): ComponentInternalInstance {
+  const instance: ComponentInternalInstance = {
     vnode,
+    type: vnode.type,
   }
 
   return instance
+}
+
+export function setupComponent(instance: ComponentInternalInstance) {
+  const {} = instance.vnode
+
+  // initProps
+  // initSlots
+
+  setupStatefulComponent(instance)
+}
+
+// TODO: 处理setup
+export function setupStatefulComponent(instance: ComponentInternalInstance) {
+  finishComponentSetup(instance)
+}
+
+export function finishComponentSetup(instance: ComponentInternalInstance) {
+  const Component = instance.type
+
+  console.log('Component', Component)
+
+  if (Component.render) {
+    instance.render = Component.render
+  }
 }
 
 export function isClassComponent(value: unknown): value is ClassComponent {

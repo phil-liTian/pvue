@@ -52,6 +52,11 @@ export interface VNode<
 
   // DOM
   el: HostNode | null
+
+  /**
+   * @internal
+   */
+  dynamicChildren: (VNode[] & { hasOnce?: boolean }) | null
 }
 
 export type VNodeTypes = VNode | string | Component | typeof Comment
@@ -103,6 +108,7 @@ export function cloneVNode(
     patchFlag,
     shapeFlag,
     el: vnode.el,
+    dynamicChildren: vnode.dynamicChildren,
   }
 
   return cloned
@@ -184,6 +190,7 @@ function createBaseVNode(
     patchFlag,
     shapeFlag,
     el: null,
+    dynamicChildren: null,
   } as VNode
   if (needFullChildrenNormalization) {
     normalizeChildren(vnode, children)
@@ -196,6 +203,14 @@ function createBaseVNode(
   // NaN
   if (vnode.key !== vnode.key) {
     warn(`VNode created with invalid key (NaN). VNode type:`, vnode.type)
+  }
+
+  if (
+    currentBlock &&
+    vnode.patchFlag > 0 &&
+    vnode.patchFlag !== PatchFlags.NEED_HYDRATION
+  ) {
+    currentBlock.push(vnode)
   }
 
   return vnode
@@ -252,4 +267,33 @@ export function normalizeChildren(vnode: VNode, children: unknown): void {
   }
   vnode.children = children
   vnode.shapeFlag |= type
+}
+
+export const blockStack: VNode['dynamicChildren'][] = []
+export let currentBlock: VNode['dynamicChildren'] = null
+export let isBlockTreeEnabled = 1
+
+export function openBlock(disableTracking = false) {
+  blockStack.push((currentBlock = disableTracking ? null : []))
+}
+
+export function closeBlock(): void {
+  blockStack.pop()
+  currentBlock = blockStack[blockStack.length - 1] || null
+}
+
+function setupBlock(vnode: VNode) {
+  vnode.dynamicChildren = isBlockTreeEnabled > 0 ? currentBlock || [] : null
+
+  return vnode
+}
+
+export function createBlock(
+  type: VNodeTypes,
+  props?: Record<string, any> | null,
+  children?: any,
+  patchFlag?: number,
+  dynamicProps?: string[]
+) {
+  return setupBlock(createVNode(type, props, children, patchFlag))
 }

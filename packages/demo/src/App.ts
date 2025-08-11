@@ -1,5 +1,12 @@
+import { h } from 'pvue'
 export const App = {
   render() {
-    return 'hi-vue'
+    return h('div', null, 'hi-pvue')
+  },
+
+  setup() {
+    return {
+      msg: 'p-vue',
+    }
   },
 }

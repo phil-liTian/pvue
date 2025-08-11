@@ -30,13 +30,12 @@ importers:
 
   packages/demo:
     dependencies:
-      vite:
-        specifier: ^7.1.1
-        version: 7.1.1(@types/node@24.1.0)
-    devDependencies:
       pvue:
         specifier: workspace:*
         version: link:../pvue
+      vite:
+        specifier: ^7.1.1
+        version: 7.1.1(@types/node@24.1.0)
 
   packages/pvue:
     devDependencies:
@@ -67,6 +66,9 @@ importers:
       '@pvue/runtime-core':
         specifier: workspace:*
         version: link:../runtime-core
+      '@pvue/shared':
+        specifier: workspace:*
+        version: link:../shared
 
   packages/shared: {}
 

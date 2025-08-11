@@ -1,7 +1,11 @@
-import { createRender } from '@pvue/runtime-core'
+import { createRenderer } from '@pvue/runtime-core'
+import { extend } from '@pvue/shared'
+import { nodeOps } from './nodeOps'
+
+const renderOptions = extend({}, nodeOps)
 
 function ensureRenderer() {
-  return createRender()
+  return createRenderer(renderOptions)
 }
 
 export const createApp = (...args) => {

@@ -1,14 +1,20 @@
 import { ComponentPublicInstance } from './componentPublicInstance'
+import { createVNode } from './vnode'
 
 export interface App<HostElement = any> {
   mount(rootCoontainer: HostElement | string): ComponentPublicInstance
 }
 
-export function createAppAPI() {
-  return function createApp(...args) {
+export function createAppAPI(render) {
+  return function createApp(rootComponent) {
+    console.log('args', rootComponent)
+
     const app: App = {
-      mount(rootCoontainer) {
-        console.log('rootCoontainer', rootCoontainer)
+      mount(rootContainer) {
+        const vnode = createVNode(rootComponent)
+        console.log('rootCoontainer', vnode)
+
+        render(vnode, rootContainer)
       },
     }
 

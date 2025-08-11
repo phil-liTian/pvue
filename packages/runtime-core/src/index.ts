@@ -3,4 +3,4 @@ export { h } from './h'
 
 export { isClassComponent, type ClassComponent } from './component'
 
-export { createRender } from './renderer'
+export { createRenderer, type RenderOptions } from './renderer'
