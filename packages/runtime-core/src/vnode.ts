@@ -205,9 +205,10 @@ function createBaseVNode(
     warn(`VNode created with invalid key (NaN). VNode type:`, vnode.type)
   }
 
+  // patchFlag 不是NEED_HYDRATION 且 (patchFlag > 0 或者是Component组件) 都可以使用openBlock
   if (
     currentBlock &&
-    vnode.patchFlag > 0 &&
+    (vnode.patchFlag > 0 || shapeFlag & ShapeFlags.COMPONENT) &&
     vnode.patchFlag !== PatchFlags.NEED_HYDRATION
   ) {
     currentBlock.push(vnode)
@@ -285,6 +286,12 @@ export function closeBlock(): void {
 function setupBlock(vnode: VNode) {
   vnode.dynamicChildren = isBlockTreeEnabled > 0 ? currentBlock || [] : null
 
+  closeBlock()
+
+  if (isBlockTreeEnabled && currentBlock) {
+    currentBlock.push(vnode)
+  }
+
   return vnode
 }
 
@@ -296,4 +303,8 @@ export function createBlock(
   dynamicProps?: string[]
 ) {
   return setupBlock(createVNode(type, props, children, patchFlag))
+}
+
+export function transformVNodeArgs() {
+  console.log('transformVNodeArgs')
 }

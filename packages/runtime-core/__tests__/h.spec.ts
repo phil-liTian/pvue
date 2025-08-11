@@ -11,4 +11,67 @@ describe('renderer: h', () => {
       createVNode('div', { id: 'foo' })
     )
   })
+
+  test('type + omit props', () => {
+    // array
+    expect(h('div', ['foo'])).toMatchObject(createVNode('div', null, ['foo']))
+    // default slot
+    const Component = { template: '<br />' }
+    const slot = () => {}
+    expect(h(Component, slot)).toMatchObject(createVNode(Component, null, slot))
+    // // single vnode
+    const vnode = h('div')
+    expect(h('div', vnode)).toMatchObject(createVNode('div', null, [vnode]))
+    // // text
+    expect(h('div', 'foo')).toMatchObject(createVNode('div', null, 'foo'))
+  })
+
+  test('type + props + children', () => {
+    // array
+    expect(h('div', {}, ['foo'])).toMatchObject(createVNode('div', {}, ['foo']))
+    // slots
+    const slots = {} as any
+    expect(h('div', {}, slots)).toMatchObject(createVNode('div', {}, slots))
+    const Component = { template: '<br />' }
+    expect(h(Component, {}, slots)).toMatchObject(
+      createVNode(Component, {}, slots)
+    )
+    // // default slot
+    const slot = () => {}
+    expect(h(Component, {}, slot)).toMatchObject(
+      createVNode(Component, {}, slot)
+    )
+    // // single vnode
+    const vnode = h('div')
+    expect(h('div', {}, vnode)).toMatchObject(createVNode('div', {}, [vnode]))
+    // // text
+    expect(h('div', {}, 'foo')).toMatchObject(createVNode('div', {}, 'foo'))
+  })
+
+  test('named slots with null props', () => {
+    const Component = { template: '<br />' }
+    const slot = () => {}
+    expect(
+      h(Component, null, {
+        foo: slot,
+      })
+    ).toMatchObject(
+      createVNode(Component, null, {
+        foo: slot,
+      })
+    )
+  })
+
+  test('support variadic children', () => {
+    // @ts-expect-error
+    const vnode = h('div', null, h('span'), h('span'))
+    expect(vnode.children).toMatchObject([
+      {
+        type: 'span',
+      },
+      {
+        type: 'span',
+      },
+    ])
+  })
 })
