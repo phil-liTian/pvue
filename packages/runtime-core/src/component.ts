@@ -4,15 +4,23 @@
  */
 import { VNode } from './vnode'
 import type { ComponentOptions } from './componentOptions'
+import { PublicInstanceProxyHandlers } from './componentPublicInstance'
 import { isFunction } from '@pvue/shared'
 
 export type Data = Record<string, unknown>
 
 export type Component = ComponentOptions & {}
 
-export type ConcreteComponent = any
+export type ConcreteComponent<
+  Props = {},
+  RawBindings = any,
+  D = any
+> = ComponentOptions
 
+let uid = 0
 export interface ComponentInternalInstance {
+  uuid: number
+  data: Data
   vnode: VNode
   type: ConcreteComponent
   render?: Function
@@ -27,6 +35,7 @@ export function createComponentInstance(
   parent?: ComponentInternalInstance | null
 ): ComponentInternalInstance {
   const instance: ComponentInternalInstance = {
+    uuid: ++uid,
     vnode,
     type: vnode.type,
   }
@@ -50,8 +59,6 @@ export function setupStatefulComponent(instance: ComponentInternalInstance) {
 
 export function finishComponentSetup(instance: ComponentInternalInstance) {
   const Component = instance.type
-
-  console.log('Component', Component)
 
   if (Component.render) {
     instance.render = Component.render

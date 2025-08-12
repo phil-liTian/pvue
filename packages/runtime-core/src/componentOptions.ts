@@ -1,4 +1,5 @@
-export type ComponentOptions = {}
+export type ComponentOptions = ComponentOptionsBase
 
-
-export type ComponentOptionsBase = {}
+export type ComponentOptionsBase = {
+  render?: Function
+}

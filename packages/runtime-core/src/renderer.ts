@@ -6,6 +6,8 @@ import {
   setupComponent,
 } from './component'
 import { VNode } from './vnode'
+import { renderComponentRoot } from './componentRenderUtils'
+import { ReactiveEffect } from '@pvue/reactivity'
 
 export interface RendererNode {
   [key: string | symbol]: any
@@ -37,8 +39,15 @@ function baseCreateRenderer(options) {
     instance: ComponentInternalInstance,
     container
   ) => {
-    const subTree = instance.render!()
-    patch(instance.vnode, subTree, container)
+    const componentUpdateFn = () => {
+      const subTree = (instance.subTree = renderComponentRoot(instance))
+
+      patch(instance.vnode, subTree, container)
+    }
+
+    const effect = new ReactiveEffect(componentUpdateFn)
+
+    effect.run()
   }
 
   const mountComponent = (initialVNode, container) => {
@@ -70,6 +79,8 @@ function baseCreateRenderer(options) {
   }
 
   const patch = (n1, n2: VNode, container) => {
+    console.log('n2', n2)
+
     const { shapeFlag } = n2
 
     if (shapeFlag & ShapeFlags.COMPONENT) {
@@ -84,6 +95,7 @@ function baseCreateRenderer(options) {
   }
 
   return {
+    render,
     createApp: createAppAPI(render),
   }
 }

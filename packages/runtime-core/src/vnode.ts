@@ -115,7 +115,7 @@ export function cloneVNode(
 }
 
 function _createVNode(
-  type: VNodeTypes | ClassComponent,
+  type: VNodeTypes | ClassComponent | typeof Fragment | typeof Text,
   props: Data | null = null,
   children: unknown = null,
   patchFlag: number = 0

@@ -1,17 +1,17 @@
 {
-  "name": "@pvue/runtime-core",
+  "name": "@pvue/runtime-test",
   "version": "1.0.0",
+  "description": "",
   "main": "index.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "keywords": [],
-  "author": "phil",
+  "author": "",
   "license": "ISC",
-  "description": "",
   "devDependencies": {
-    "@pvue/reactivity": "workspace:*",
-    "@pvue/shared": "workspace:*",
-    "@pvue/runtime-test": "workspace:*"
+    "@pvue/runtime-core": "workspace:*",
+    "@pvue/runtime-dom": "workspace:*",
+    "@pvue/reactivity": "workspace:*"
   }
 }
