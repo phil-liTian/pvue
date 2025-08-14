@@ -4,6 +4,7 @@
  */
 export {
   reactive,
+  shallowReadonly,
   isReactive,
   isShallow,
   isReadonly,

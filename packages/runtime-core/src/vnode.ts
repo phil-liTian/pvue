@@ -18,6 +18,7 @@ import {
   isFunction,
   isOn,
 } from '@pvue/shared'
+import { AppContext } from './apiCreateApp'
 
 export const Comment: unique symbol = Symbol.for('v-cmt')
 export const Fragment = Symbol.for('v-fgt')
@@ -43,6 +44,7 @@ export interface VNode<
    */
   __v_isVNode: true
   [ReactiveFlags.SKIP]: true
+  appContext: AppContext | null
   type: VNodeTypes
   props: Data
   key: PropertyKey | null
@@ -109,6 +111,7 @@ export function cloneVNode(
     shapeFlag,
     el: vnode.el,
     dynamicChildren: vnode.dynamicChildren,
+    appContext: vnode.appContext,
   }
 
   return cloned
@@ -191,6 +194,7 @@ function createBaseVNode(
     shapeFlag,
     el: null,
     dynamicChildren: null,
+    appContext: null,
   } as VNode
   if (needFullChildrenNormalization) {
     normalizeChildren(vnode, children)

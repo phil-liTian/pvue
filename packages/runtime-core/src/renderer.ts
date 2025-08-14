@@ -40,7 +40,12 @@ function baseCreateRenderer(options) {
     container
   ) => {
     const componentUpdateFn = () => {
+      const { m } = instance
       const subTree = (instance.subTree = renderComponentRoot(instance))
+
+      if (m) {
+        m.forEach(v => v())
+      }
 
       patch(instance.vnode, subTree, container)
     }
@@ -51,7 +56,7 @@ function baseCreateRenderer(options) {
   }
 
   const mountComponent = (initialVNode, container) => {
-    const instance = createComponentInstance(initialVNode)
+    const instance = createComponentInstance(initialVNode, null)
 
     setupComponent(instance)
 
@@ -79,8 +84,6 @@ function baseCreateRenderer(options) {
   }
 
   const patch = (n1, n2: VNode, container) => {
-    console.log('n2', n2)
-
     const { shapeFlag } = n2
 
     if (shapeFlag & ShapeFlags.COMPONENT) {

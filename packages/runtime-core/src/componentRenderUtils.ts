@@ -4,8 +4,8 @@ import { normalizeVNode, VNode } from './vnode'
 export function renderComponentRoot(
   instance: ComponentInternalInstance
 ): VNode {
-  const { vnode, render } = instance
+  const { vnode, render, proxy } = instance
 
-  const result = normalizeVNode(render?.())
+  const result = normalizeVNode(render?.call(proxy))
   return result
 }
