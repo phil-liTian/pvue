@@ -27,7 +27,20 @@ const createHook =
 
 type CreateHook<T = any> = (
   hook: T,
-  target: ComponentInternalInstance | null
+  target?: ComponentInternalInstance | null
 ) => void
 
 export const onMounted: CreateHook = createHook(LifecycleHooks.MOUNTED)
+
+export type ErrorCapturedHook<TERROR = unknown> = (
+  err: TERROR,
+  instance: ComponentInternalInstance | null,
+  info: string
+) => boolean | void
+
+export function onErrorCaptured<TERROE = Error>(
+  hook: ErrorCapturedHook<TERROE>,
+  target: ComponentInternalInstance | null = currentInstance
+): void {
+  injectHook(LifecycleHooks.ERROR_CAPTURED, hook, target)
+}

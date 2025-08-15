@@ -69,6 +69,8 @@ export interface ComponentInternalInstance {
 
   // 生命周期函数
   [LifecycleHooks.MOUNTED]: LifecycleHook
+
+  n?: () => Promise<void>
 }
 
 export class ClassComponent {

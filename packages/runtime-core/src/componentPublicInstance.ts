@@ -12,6 +12,7 @@ import {
 } from './component'
 import { shallowReadonly, toRaw, warn } from '@pvue/reactivity'
 import { AppContext } from './apiCreateApp'
+import { nextTick } from './scheduler'
 
 export type ComponentPublicInstance = {}
 
@@ -37,7 +38,7 @@ export const publicPropertiesMap: PublicPropertiesMap = {
   $el: i => i.vnode.el,
   $options: i => i.type,
 
-  $nextTick: i => () => {},
+  $nextTick: i => i.n || (i.n = nextTick.bind(i.proxy)),
 }
 
 export interface ComponentRenderContext {

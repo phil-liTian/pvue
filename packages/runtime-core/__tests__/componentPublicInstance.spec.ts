@@ -69,7 +69,7 @@ describe('component: proxy', () => {
     expect('count' in instanceProxy).toBe(false)
   })
 
-  test.skip('public properties', async () => {
+  test('public properties', async () => {
     let instance: ComponentInternalInstance
     let instanceProxy: any
     const Comp = {
@@ -104,7 +104,6 @@ describe('component: proxy', () => {
     const nextTickThis = await instanceProxy.$nextTick(function (this: any) {
       return this
     })
-    // TODO
     expect(nextTickThis).toBe(instanceProxy)
   })
 

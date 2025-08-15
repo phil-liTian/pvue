@@ -29,7 +29,7 @@ export function createRenderer<HostNode, HostElement>(
 
 function baseCreateRenderer(options) {
   const {
-    createElement: hostCreateElemnt,
+    createElement: hostCreateElement,
     setElementText: hostSetElementText,
     insert: hostInsert,
   } = options
@@ -70,7 +70,7 @@ function baseCreateRenderer(options) {
   // 处理element
   const mountElement = (vnode: VNode, container) => {
     const { shapeFlag, children } = vnode
-    let el = hostCreateElemnt(vnode.type)
+    let el = hostCreateElement(vnode.type)
 
     if (shapeFlag & ShapeFlags.TEXT_CHILDREN) {
       hostSetElementText(el, children)
