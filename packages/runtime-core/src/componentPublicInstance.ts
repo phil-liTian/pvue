@@ -157,21 +157,6 @@ export function exposeSetupStateOnRenderContext(
   })
 }
 
-export function normalizePropsOptions(
-  comp: ConcreteComponent,
-  appContext: AppContext
-) {
-  const raw = comp.props
-
-  let normalized = {}
-  if (!isFunction(comp)) {
-    extend(normalized, raw)
-  }
-
-  let res = [normalized]
-
-  return res
-}
 
 // 给ctx定义一个不可被枚举的_属性
 export function createDevRenderContext(instance: ComponentInternalInstance) {

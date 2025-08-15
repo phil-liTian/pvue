@@ -17,6 +17,7 @@ import { Target, reactive, reactiveMap, readonly, toRaw } from './reactive'
 import { ITERATE_KEY, track, trigger } from './dep'
 import { arrayInstrumentations } from './arrayInstrumentations'
 import { isRef } from './ref'
+import { warn } from './warning'
 
 const isNonTrackableKeys = makeMap('__proto__,__v_isRef,__isVue')
 // 内置的symbol集合
@@ -184,7 +185,14 @@ class ReadonlyReactiveHandler extends BaseReactiveHandler {
     super(true, isShallow)
   }
 
-  set() {
+  set(target, key) {
+    if (__DEV__) {
+      warn(
+        `Set operation on key "${String(key)}" failed: target is readonly.`,
+        target
+      )
+    }
+
     return true
   }
 }

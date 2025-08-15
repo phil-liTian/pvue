@@ -5,9 +5,11 @@
 export {
   reactive,
   shallowReadonly,
+  shallowReactive,
   isReactive,
   isShallow,
   isReadonly,
+  readonly,
   isProxy,
   markRaw,
   toRaw,

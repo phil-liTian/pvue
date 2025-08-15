@@ -439,7 +439,6 @@ describe('component: proxy', () => {
     render(h(Comp), nodeOps.createElement('div'))
     expect(
       `was accessed during render but is not defined`
-      // @ts-ignore
     ).not.toHaveBeenWarned()
   })
 
