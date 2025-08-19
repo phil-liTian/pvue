@@ -9,15 +9,20 @@ import {
   createDevRenderContext,
   exposePropsOnRenderContext,
   exposeSetupStateOnRenderContext,
-  normalizePropsOptions,
   PublicInstanceProxyHandlers,
 } from './componentPublicInstance'
-import { EMPTY_OBJ, isFunction, ShapeFlags } from '@pvue/shared'
+import { EMPTY_OBJ, isFunction, isObject, ShapeFlags } from '@pvue/shared'
 import { currentRenderingInstance } from './componentRenderContext'
 import { LifecycleHooks } from './enums'
 import { SchedulerJob } from './scheduler'
 import { AppContext, createAppContext } from './apiCreateApp'
-import { initProps, NormalizedPropsOptions } from './componentProps'
+import {
+  ComponentPropsOptions,
+  initProps,
+  NormalizedPropsOptions,
+  normalizePropsOptions,
+} from './componentProps'
+import { callWithErrorHandling, ErrorCodes } from './errorHandling'
 
 export type LifecycleHook<TFn = Function> = (TFn | SchedulerJob)[] | null
 
@@ -25,11 +30,20 @@ export type Data = Record<string, unknown>
 
 export type Component = ComponentOptions & {}
 
+export interface FunctionalComponent<P = {}> {
+  (props: P, ctx: SetupContext): any
+  props?: ComponentPropsOptions<P>
+}
+
 export type ConcreteComponent<
   Props = {},
   RawBindings = any,
   D = any
 > = ComponentOptions
+
+export type SetupContext = {
+  attrs: Data
+}
 
 let uid = 0
 export interface ComponentInternalInstance {
@@ -48,6 +62,12 @@ export interface ComponentInternalInstance {
    * @inernal 上下文对象, 返回组件实例, 用在PublicInstanceProxyHandlers组件代理对象中
    */
   ctx: Data
+
+  /**
+   * @internal
+   */
+
+  setupContext: SetupContext | null
 
   // 组件代理对象, 可用作在applyOptions中的this的指向
   proxy: ComponentPublicInstance | null
@@ -108,11 +128,14 @@ export function createComponentInstance(
     refs: EMPTY_OBJ,
     slots: EMPTY_OBJ,
 
+    // 处理组件可以接受的props配置
     propsOptions: normalizePropsOptions(type, appContext),
 
     emit: null!,
 
     m: null,
+
+    setupContext: null,
   }
   if (__DEV__) {
     instance.ctx = createDevRenderContext(instance)
@@ -126,9 +149,10 @@ export function createComponentInstance(
 }
 
 export function setupComponent(instance: ComponentInternalInstance) {
-  const { props } = instance.type
+  const { props } = instance.vnode
+  const isStateful = isStatefulComponent(instance)
   // 处理props、slots
-  initProps(instance, props)
+  initProps(instance, props, isStateful)
   // initSlots
 
   // 处理stateful-component 对象组件
@@ -151,15 +175,24 @@ export function setupStatefulComponent(instance: ComponentInternalInstance) {
   if (setup) {
     if (isFunction(setup)) {
       // 如果setup是函数，则执行setup函数获取返回结果
-      const setupResult = setup()
+      // const setupResult = setup()
+      const setupContext = (instance.setupContext =
+        setup.length > 1 ? createSetupContext(instance) : null)
+
+      const setupResult = callWithErrorHandling(
+        setup,
+        instance,
+        ErrorCodes.SETUP_FUNCTION,
+        [instance.props, setupContext]
+      )
 
       // 处理setup函数的返回结果，可能是响应式对象或渲染函数
       handleSetupResult(instance, setupResult)
     }
-  }
 
-  // 设置当前实例为活动实例，为兼容Options API做准备
-  setCurrentInstance(instance)
+    // 设置当前实例为活动实例，为兼容Options API做准备
+    setCurrentInstance(instance)
+  }
 
   // 完成组件设置，处理模板编译、渲染函数等剩余的组件初始化工作
   finishComponentSetup(instance)
@@ -172,7 +205,8 @@ function handleSetupResult(
   setupResult: unknown
 ) {
   if (isFunction(setupResult)) {
-  } else {
+    instance.render = setupResult
+  } else if (isObject(setupResult)) {
     // 是一个对象
     instance.setupState = setupResult as Data
 
@@ -183,15 +217,22 @@ function handleSetupResult(
   }
 }
 
-export function finishComponentSetup(instance: ComponentInternalInstance) {
+export function finishComponentSetup(
+  instance: ComponentInternalInstance,
+  skipOptions?: boolean
+) {
   const Component = instance.type
 
   if (Component.render) {
     instance.render = Component.render
   }
 
-  // 处理component 配置options 比如 data, lifeCycle and so on
-  applyOptions(instance)
+  if (__FEATURE_OPTIONS_API__ && !(__COMPAT__ && skipOptions)) {
+    setCurrentInstance(instance)
+
+    // 处理component 配置options 比如 data, lifeCycle and so on
+    applyOptions(instance)
+  }
 }
 
 export function isClassComponent(value: unknown): value is ClassComponent {
@@ -222,5 +263,12 @@ export const getComponentPublicInstance = (
   if (instance.exposed) {
   } else {
     return instance.proxy
+  }
+}
+
+export function createSetupContext(instance: ComponentInternalInstance) {
+  const { attrs } = instance
+  return {
+    attrs,
   }
 }

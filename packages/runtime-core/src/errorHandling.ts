@@ -1,3 +1,7 @@
+/*
+ * @Author: phil
+ * @Date: 2025-08-15 11:54:23
+ */
 import { ComponentInternalInstance } from './component'
 import { LifecycleHooks } from './enums'
 import { warn } from './warning'
@@ -64,10 +68,11 @@ export const ErrorTypeStrings: Record<ErrorTypes, string> = {
 export function callWithErrorHandling(
   fn: Function,
   instance: ComponentInternalInstance | null | undefined,
-  type: ErrorTypes
+  type: ErrorTypes,
+  args?: unknown[]
 ) {
   try {
-    fn()
+    return args ? fn(...args) : fn()
   } catch (error) {
     handleError(error, instance, type)
   }

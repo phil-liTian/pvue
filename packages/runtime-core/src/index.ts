@@ -14,6 +14,10 @@ export { defineComponent } from './apiDefineComponent'
 
 export { onMounted, onErrorCaptured } from './apiLifecycle'
 
+export {} from './componentProps'
+
+export { provide, inject } from './apiInject'
+
 export {
   nextTick,
   queueJob,

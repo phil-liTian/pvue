@@ -52,10 +52,7 @@ const hasSetupBinding = (state: Data, key: string) => {
 
 export const PublicInstanceProxyHandlers: ProxyHandler<any> = {
   get({ _: instance }: ComponentRenderContext, key: string) {
-    console.log('key', key)
-
     const { data, setupState, ctx, appContext } = instance
-
     let globalProperties
     if (hasOwn(data, key)) {
       return data[key]
@@ -147,6 +144,8 @@ export function exposeSetupStateOnRenderContext(
   instance: ComponentInternalInstance
 ): void {
   const { ctx, setupState } = instance
+  console.log('setupState', setupState)
+
   Object.keys(toRaw(setupState)).forEach(key => {
     Object.defineProperty(ctx, key, {
       enumerable: true,
@@ -156,7 +155,6 @@ export function exposeSetupStateOnRenderContext(
     })
   })
 }
-
 
 // 给ctx定义一个不可被枚举的_属性
 export function createDevRenderContext(instance: ComponentInternalInstance) {
