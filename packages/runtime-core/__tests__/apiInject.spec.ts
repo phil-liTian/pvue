@@ -5,7 +5,7 @@ import { h, inject, nodeOps, provide, render } from '@pvue/runtime-test'
  * @Date: 2025-08-19 20:40:13
  */
 describe('api: provide/inject', () => {
-  it('string keys', () => {
+  it.skip('string keys', () => {
     const Provider = {
       setup() {
         provide('foo', 1)

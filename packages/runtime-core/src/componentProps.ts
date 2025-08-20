@@ -126,8 +126,6 @@ function setFullProps(
       }
     }
   }
-  console.log('rawCastValues', rawCastValues)
-
   if (needCastKeys) {
     const rawCurrentProps = toRaw(props)
     const castValues = rawCastValues || EMPTY_OBJ

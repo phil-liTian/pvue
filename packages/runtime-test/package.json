@@ -12,6 +12,7 @@
   "devDependencies": {
     "@pvue/runtime-core": "workspace:*",
     "@pvue/runtime-dom": "workspace:*",
-    "@pvue/reactivity": "workspace:*"
+    "@pvue/reactivity": "workspace:*",
+    "@pvue/shared": "workspace:*"
   }
 }

@@ -144,7 +144,6 @@ export function exposeSetupStateOnRenderContext(
   instance: ComponentInternalInstance
 ): void {
   const { ctx, setupState } = instance
-  console.log('setupState', setupState)
 
   Object.keys(toRaw(setupState)).forEach(key => {
     Object.defineProperty(ctx, key, {

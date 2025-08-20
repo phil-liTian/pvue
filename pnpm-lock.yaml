@@ -84,6 +84,9 @@ importers:
       '@pvue/runtime-dom':
         specifier: workspace:*
         version: link:../runtime-dom
+      '@pvue/shared':
+        specifier: workspace:*
+        version: link:../shared
 
   packages/shared: {}
 

@@ -61,7 +61,12 @@ export interface VNode<
   dynamicChildren: (VNode[] & { hasOnce?: boolean }) | null
 }
 
-export type VNodeTypes = VNode | string | Component | typeof Comment
+export type VNodeTypes =
+  | VNode
+  | string
+  | Component
+  | typeof Comment
+  | typeof Text
 
 export type VNodeChild = any
 
