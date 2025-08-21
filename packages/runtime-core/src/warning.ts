@@ -1,3 +1,3 @@
 export function warn(msg: string) {
-  console.warn(msg)
+  console.warn(`[Vue warn]: ${msg}`)
 }

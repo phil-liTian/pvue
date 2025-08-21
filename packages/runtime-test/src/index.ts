@@ -17,4 +17,4 @@ export const createApp = baseCreateApp
 export * from './nodeOps'
 export * from '@pvue/runtime-core'
 
-export { serialize } from './serialize'
+export { serialize, serializeInner } from './serialize'

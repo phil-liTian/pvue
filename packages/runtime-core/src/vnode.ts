@@ -67,6 +67,7 @@ export type VNodeTypes =
   | Component
   | typeof Comment
   | typeof Text
+  | typeof Fragment
 
 export type VNodeChild = any
 
@@ -242,7 +243,7 @@ export function normalizeVNode(child: VNodeChild): VNode {
   if (child == null || typeof child === 'boolean') {
     return createVNode(Comment)
   } else if (isArray(child)) {
-    return createVNode(Fragment, {}, child.slice())
+    return createVNode(Fragment, null, child.slice())
   } else if (isVNode(child)) {
     return cloneIfMounted(child)
   } else {
@@ -316,4 +317,8 @@ export function createBlock(
 
 export function transformVNodeArgs() {
   console.log('transformVNodeArgs')
+}
+
+export function isSameVNodeType(n1: VNode, n2: VNode): Boolean {
+  return n1.type === n2.type && n1.key === n2.key
 }

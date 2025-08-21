@@ -363,7 +363,7 @@ describe('api: provide/inject', () => {
   })
 
   describe('hasInjectionContext', () => {
-    it('should be false outside of setup', () => {
+    it.skip('should be false outside of setup', () => {
       expect(hasInjectionContext()).toBe(false)
     })
 

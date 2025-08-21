@@ -45,7 +45,11 @@ function serializeElement(node: TestElement, indent: number, depth: number) {
   )
 }
 
-function serializeInner(node: TestElement, indent, depth) {
+export function serializeInner(
+  node: TestElement,
+  indent: number = 0,
+  depth: number = 0
+) {
   const newLine = indent ? `\n` : ``
 
   return node.children.length

@@ -1,3 +1,4 @@
+import { Component, Data } from './component'
 import { ComponentPublicInstance } from './componentPublicInstance'
 import { createVNode } from './vnode'
 
@@ -24,8 +25,13 @@ export function createAppContext(): AppContext {
   }
 }
 
-export function createAppAPI(render) {
-  return function createApp(rootComponent) {
+export type CreateAppFunction = (
+  rootComponent: Component,
+  rootProps?: Data | null
+) => App
+
+export function createAppAPI(render): CreateAppFunction {
+  return function createApp(rootComponent, rootProps = null) {
     const context = createAppContext()
 
     const app: App = {

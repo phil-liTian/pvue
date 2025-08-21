@@ -13,7 +13,7 @@ function ensureRenderer() {
   return createRenderer(renderOptions)
 }
 
-export const createApp = (...args) => {
+export const createApp = (...args: any[]) => {
   const app = ensureRenderer().createApp(...args)
 
   return app

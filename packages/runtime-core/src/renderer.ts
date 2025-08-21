@@ -5,7 +5,14 @@ import {
   createComponentInstance,
   setupComponent,
 } from './component'
-import { normalizeVNode, VNode, Text, Comment } from './vnode'
+import {
+  normalizeVNode,
+  VNode,
+  Text,
+  Comment,
+  Fragment,
+  isSameVNodeType,
+} from './vnode'
 import { renderComponentRoot } from './componentRenderUtils'
 import { ReactiveEffect } from '@pvue/reactivity'
 import { queueJob, SchedulerJob } from './scheduler'
@@ -54,6 +61,7 @@ function baseCreateRenderer(options) {
         const subTree = (instance.subTree = renderComponentRoot(instance))
 
         if (m) {
+          // @ts-ignore
           m.forEach(v => v())
         }
         // 不涉及到更新操作
@@ -150,6 +158,41 @@ function baseCreateRenderer(options) {
     }
   }
 
+  function processFragment(n1: VNode | null, n2: VNode, container) {
+    if (n1 == null) {
+      mountChildren(n2.children, container)
+    } else {
+      // 处理children
+      patchChildren(n1, n2, container)
+    }
+  }
+
+  function patchChildren(n1: VNode, n2: VNode, container) {
+    const c1 = n1 && n1.children
+    const c2 = n2.children
+    const { shapeFlag } = n2
+
+    patchKeyedChildren(c1, c2, container)
+  }
+
+  function patchKeyedChildren(c1: VNode[], c2: VNode[], container) {
+    let i = 0
+    const l2 = c2.length
+    const e1 = c1.length - 1
+    const e2 = l2 - 1
+
+    while (i <= e1 && i <= e2) {
+      const n1 = c1[i]
+      const n2 = c2[i]
+
+      if (isSameVNodeType(n1, n2)) {
+        patch(n1, n2, container, null)
+      }
+
+      i++
+    }
+  }
+
   const patch = (
     n1: VNode | null,
     n2: VNode,
@@ -165,6 +208,9 @@ function baseCreateRenderer(options) {
       case Comment:
         processCommentNode(n1, n2, container)
         break
+      case Fragment:
+        processFragment(n1, n2, container)
+        break
       default:
         if (shapeFlag & ShapeFlags.COMPONENT) {
           processComponent(n2, container, parentComponent)
@@ -178,8 +224,9 @@ function baseCreateRenderer(options) {
     patch(null, vnode, rootContainer)
   }
 
+  // let hydrate: null = null
   return {
     render,
-    createApp: createAppAPI(render),
+    createApp: createAppAPI(render) as any,
   }
 }

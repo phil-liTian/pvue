@@ -5,12 +5,22 @@
 import { ShapeFlags } from '@pvue/shared'
 import { ComponentInternalInstance, FunctionalComponent } from './component'
 import { normalizeVNode, VNode } from './vnode'
+import { setCurrentRenderingInstance } from './componentRenderContext'
 
 export function renderComponentRoot(
   instance: ComponentInternalInstance
 ): VNode {
-  const { vnode, render, proxy, type: Component, props, attrs } = instance
+  const {
+    vnode,
+    render,
+    proxy,
+    type: Component,
+    props,
+    attrs,
+    slots,
+  } = instance
   let result
+  setCurrentRenderingInstance(instance)
   try {
     if (vnode.shapeFlag & ShapeFlags.STATEFUL_COMPONENT) {
       // 对象组件
@@ -19,7 +29,7 @@ export function renderComponentRoot(
       // 函数组件
       const render = Component as FunctionalComponent
 
-      result = normalizeVNode(render(props, { attrs }))
+      result = normalizeVNode(render(props, { attrs, slots }))
     }
   } finally {
   }

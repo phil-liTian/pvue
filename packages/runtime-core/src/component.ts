@@ -23,6 +23,7 @@ import {
   normalizePropsOptions,
 } from './componentProps'
 import { callWithErrorHandling, ErrorCodes } from './errorHandling'
+import { initSlots } from './componentSlots'
 
 export type LifecycleHook<TFn = Function> = (TFn | SchedulerJob)[] | null
 
@@ -42,6 +43,7 @@ export type ConcreteComponent<Props = {}, RawBindings = any, D = any> =
 
 export type SetupContext = {
   attrs: Data
+  slots: Data
 }
 
 let uid = 0
@@ -163,7 +165,7 @@ export function setupComponent(instance: ComponentInternalInstance) {
   const isStateful = isStatefulComponent(instance)
   // 处理props、slots
   initProps(instance, props, isStateful)
-  // initSlots
+  initSlots(instance, instance.vnode.children)
 
   // 处理stateful-component 对象组件
   setupStatefulComponent(instance)
@@ -280,8 +282,9 @@ export const getComponentPublicInstance = (
 }
 
 export function createSetupContext(instance: ComponentInternalInstance) {
-  const { attrs } = instance
+  const { attrs, slots } = instance
   return {
     attrs,
+    slots,
   }
 }
