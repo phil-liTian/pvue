@@ -1,26 +1,33 @@
 import { isArray, isFunction, isObject, NOOP } from '@pvue/shared'
 import { ComponentInternalInstance } from './component'
 import { onMounted } from './apiLifecycle'
-import { computed, reactive, warn } from '@pvue/reactivity'
+import { computed, isRef, reactive, warn } from '@pvue/reactivity'
+import { inject } from './apiInject'
 // 处理component的配置
 
 export type ComponentOptions = ComponentOptionsBase
 
 interface LegacyOptions {
+  computed?: any
+  inject?: any
   data?: () => any
   mounted?: () => any
 }
 
 export interface ComponentOptionsBase extends LegacyOptions {
   render?: Function
-  setup?: any
+  setup?: Function
 }
+
+export type MergedComponentOptions = ComponentOptions
 
 export function mergeOptions(to: any, from: any) {}
 
-function resolveMergedOptions(instance: ComponentInternalInstance) {
+function resolveMergedOptions(
+  instance: ComponentInternalInstance
+): MergedComponentOptions {
   const base = instance.type || {}
-  let resolved = {}
+  let resolved: MergedComponentOptions = {}
 
   return Object.assign(resolved, base)
 }
@@ -30,7 +37,12 @@ export function applyOptions(instance: ComponentInternalInstance) {
   const { ctx } = instance
 
   const options = resolveMergedOptions(instance)
-  const { mounted, data: dataOptions, computed: computedOptions } = options
+  const {
+    mounted,
+    data: dataOptions,
+    computed: computedOptions,
+    inject: injectOptions,
+  } = options
   // vue2还有data配置 vue3已经不需要这个配置了
   if (dataOptions) {
     if (!isFunction(dataOptions) && __DEV__) {
@@ -60,6 +72,10 @@ export function applyOptions(instance: ComponentInternalInstance) {
         }
       }
     }
+  }
+
+  if (injectOptions) {
+    resolveInjections(injectOptions, ctx)
   }
 
   // 处理computed配置
@@ -97,4 +113,22 @@ export function applyOptions(instance: ComponentInternalInstance) {
   }
 
   registerLifecycleHook(onMounted, mounted)
+}
+
+function resolveInjections(injectOptions, ctx: any) {
+  console.log('injectOptions', injectOptions)
+  for (const key in injectOptions) {
+    const opt = injectOptions[key]
+    let injected: unknown
+    if (isObject(opt)) {
+      if ('default' in opt) {
+        injected = inject(opt.from || key, opt.default, true)
+      }
+    }
+
+    if (isRef(injected)) {
+    } else {
+      ctx[key] = injected
+    }
+  }
 }

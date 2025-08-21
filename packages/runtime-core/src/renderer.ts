@@ -5,9 +5,10 @@ import {
   createComponentInstance,
   setupComponent,
 } from './component'
-import { normalizeVNode, VNode, Text } from './vnode'
+import { normalizeVNode, VNode, Text, Comment } from './vnode'
 import { renderComponentRoot } from './componentRenderUtils'
 import { ReactiveEffect } from '@pvue/reactivity'
+import { queueJob, SchedulerJob } from './scheduler'
 
 export interface RendererNode {
   [key: string | symbol]: any
@@ -18,9 +19,11 @@ export interface RendererElement extends RendererNode {}
 export interface RenderOptions<HostNode, HostElement> {
   createElement: (type: string) => HostElement
   setElementText: (node: HostElement, text: string) => void
+  setText: (node: HostElement, text: string) => void
   insert(el: HostNode, parent: HostElement, anchor?: HostNode | null): void
   patchProp(el: HostElement, key: string, prevValue: any, nextValue: any): void
   createText(text: string): HostNode
+  createComment(text: string): HostNode
 }
 
 export function createRenderer<HostNode, HostElement>(
@@ -33,9 +36,11 @@ function baseCreateRenderer(options) {
   const {
     createElement: hostCreateElement,
     setElementText: hostSetElementText,
+    setText: hostSetText,
     insert: hostInsert,
     patchProp: hostPatchProp,
     createText: hostCreateText,
+    createComment: hostCreateComment,
   } = options
 
   // 处理component
@@ -44,38 +49,59 @@ function baseCreateRenderer(options) {
     container
   ) => {
     const componentUpdateFn = () => {
-      const { m } = instance
-      const subTree = (instance.subTree = renderComponentRoot(instance))
+      if (!instance.isMounted) {
+        const { m } = instance
+        const subTree = (instance.subTree = renderComponentRoot(instance))
 
-      if (m) {
-        m.forEach(v => v())
+        if (m) {
+          m.forEach(v => v())
+        }
+        // 不涉及到更新操作
+        patch(null, subTree, container, instance)
+
+        instance.isMounted = true
+      } else {
+        // 原来组件的tree
+        const prevTree = instance.subTree
+        // 更新后的组件的tree
+        const nextTree = renderComponentRoot(instance)
+
+        instance.subTree = nextTree
+        patch(prevTree, nextTree, container, instance)
       }
-
-      patch(instance.vnode, subTree, container)
     }
 
     const effect = new ReactiveEffect(componentUpdateFn)
 
-    effect.run()
+    const update = effect.run.bind(effect)
+
+    const job: SchedulerJob = effect.runIfDirty.bind(effect)
+    job.id = instance.uuid
+    job.i = instance
+
+    // 调度器 响应式数据发生变化之后 effect 不应该立即执行, 应该在nextTick之后再执行
+    effect.scheduler = () => queueJob(job)
+
+    update()
   }
 
-  const mountComponent = (initialVNode, container) => {
-    const instance = createComponentInstance(initialVNode, null)
+  const mountComponent = (initialVNode, container, parentComponent) => {
+    const instance = createComponentInstance(initialVNode, parentComponent)
 
     setupComponent(instance)
 
     setupRenderEffect(instance, container)
   }
 
-  const processComponent = (vnode, container) => {
-    mountComponent(vnode, container)
+  const processComponent = (vnode, container, parentComponent) => {
+    mountComponent(vnode, container, parentComponent)
   }
 
   // 处理element
   const mountElement = (vnode: VNode, container) => {
     const { shapeFlag, children, props } = vnode
 
-    let el = hostCreateElement(vnode.type)
+    let el = (vnode.el = hostCreateElement(vnode.type))
 
     if (shapeFlag & ShapeFlags.TEXT_CHILDREN) {
       hostSetElementText(el, children)
@@ -107,22 +133,41 @@ function baseCreateRenderer(options) {
     mountElement(vnode, container)
   }
 
-  function processText(n1: VNode, n2: VNode, container) {
+  function processText(n1: VNode | null, n2: VNode, container) {
     if (n1 == null) {
-      hostInsert(hostCreateText(n2.children), container)
+      hostInsert((n2.el = hostCreateText(n2.children)), container)
+    } else {
+      const el = (n2.el = n1.el)
+      if (n1.children !== n2.children) {
+        hostSetText(el, n2.children)
+      }
     }
   }
 
-  const patch = (n1, n2: VNode, container) => {
+  function processCommentNode(n1, n2, container) {
+    if (n1 == null) {
+      hostInsert(hostCreateComment(n2.children || ''), container)
+    }
+  }
+
+  const patch = (
+    n1: VNode | null,
+    n2: VNode,
+    container,
+    parentComponent: ComponentInternalInstance | null = null
+  ) => {
     const { shapeFlag, type } = n2
 
     switch (type) {
       case Text:
         processText(n1, n2, container)
         break
+      case Comment:
+        processCommentNode(n1, n2, container)
+        break
       default:
         if (shapeFlag & ShapeFlags.COMPONENT) {
-          processComponent(n2, container)
+          processComponent(n2, container, parentComponent)
         } else if (shapeFlag & ShapeFlags.ELEMENT) {
           processElement(n2, container)
         }

@@ -30,16 +30,15 @@ export type Data = Record<string, unknown>
 
 export type Component = ComponentOptions & {}
 
-export interface FunctionalComponent<P = {}> {
+export interface ComponentInternalOptions {}
+
+export interface FunctionalComponent<P = {}> extends ComponentInternalOptions {
   (props: P, ctx: SetupContext): any
   props?: ComponentPropsOptions<P>
 }
 
-export type ConcreteComponent<
-  Props = {},
-  RawBindings = any,
-  D = any
-> = ComponentOptions
+export type ConcreteComponent<Props = {}, RawBindings = any, D = any> =
+  | ComponentOptions & FunctionalComponent<Props>
 
 export type SetupContext = {
   attrs: Data
@@ -66,8 +65,12 @@ export interface ComponentInternalInstance {
   /**
    * @internal
    */
-
   setupContext: SetupContext | null
+
+  /**
+   * @internal
+   */
+  provides: Data
 
   // 组件代理对象, 可用作在applyOptions中的this的指向
   proxy: ComponentPublicInstance | null
@@ -91,9 +94,12 @@ export interface ComponentInternalInstance {
   [LifecycleHooks.MOUNTED]: LifecycleHook
 
   n?: () => Promise<void>
+
+  isMounted: boolean
 }
 
-export class ClassComponent {
+export interface ClassComponent {
+  new (...args: any[]): ComponentPublicInstance
   __vccOpts: ComponentOptions
 }
 
@@ -136,6 +142,10 @@ export function createComponentInstance(
     m: null,
 
     setupContext: null,
+    provides: parent ? parent.provides : Object.create(appContext.provides),
+
+    // 标识组件是否已挂载
+    isMounted: false,
   }
   if (__DEV__) {
     instance.ctx = createDevRenderContext(instance)
@@ -179,19 +189,18 @@ export function setupStatefulComponent(instance: ComponentInternalInstance) {
       const setupContext = (instance.setupContext =
         setup.length > 1 ? createSetupContext(instance) : null)
 
+      // 设置当前实例为活动实例，为兼容Options API做准备, 在执行setup之前就要设置currentInstance
+      const reset = setCurrentInstance(instance)
       const setupResult = callWithErrorHandling(
         setup,
         instance,
         ErrorCodes.SETUP_FUNCTION,
         [instance.props, setupContext]
       )
-
+      reset()
       // 处理setup函数的返回结果，可能是响应式对象或渲染函数
       handleSetupResult(instance, setupResult)
     }
-
-    // 设置当前实例为活动实例，为兼容Options API做准备
-    setCurrentInstance(instance)
   }
 
   // 完成组件设置，处理模板编译、渲染函数等剩余的组件初始化工作
@@ -228,10 +237,11 @@ export function finishComponentSetup(
   }
 
   if (__FEATURE_OPTIONS_API__ && !(__COMPAT__ && skipOptions)) {
-    setCurrentInstance(instance)
+    const reset = setCurrentInstance(instance)
 
     // 处理component 配置options 比如 data, lifeCycle and so on
     applyOptions(instance)
+    reset()
   }
 }
 
@@ -255,6 +265,9 @@ export const getCurrentInstance: () => ComponentInternalInstance | null =
 
 export const setCurrentInstance = (instance: ComponentInternalInstance) => {
   currentInstance = instance
+  return () => {
+    currentInstance = null
+  }
 }
 
 export const getComponentPublicInstance = (

@@ -7,10 +7,12 @@ export interface AppConfig {
 
 export interface AppContext {
   config: AppConfig
+  provides: Record<string | symbol, any>
 }
 export interface App<HostElement = any> {
   config: AppConfig
   mount(rootCoontainer: HostElement | string): ComponentPublicInstance
+  runWithContext<T>(fn: () => T): T
 }
 
 export function createAppContext(): AppContext {
@@ -18,6 +20,7 @@ export function createAppContext(): AppContext {
     config: {
       globalProperties: {},
     },
+    provides: Object.create(null),
   }
 }
 
@@ -37,8 +40,15 @@ export function createAppAPI(render) {
         vnode.appContext = context
         return render(vnode, rootContainer)
       },
+
+      runWithContext(fn) {
+        currentApp = app
+        return fn()
+      },
     }
 
     return app
   }
 }
+
+export let currentApp: App | null = null

@@ -28,7 +28,7 @@ export type ComponentObjectPropsOptions<P = Data> = {
 }
 
 export interface PropOptions<T = any, D = T> {
-  type: true | null
+  type?: true | null
   required?: boolean
   default?: D
 
@@ -147,10 +147,10 @@ function setFullProps(
 export function normalizePropsOptions(
   comp: ConcreteComponent,
   appContext: AppContext
-) {
+): NormalizedPropsOptions {
   const raw = comp.props
 
-  let normalized = {},
+  let normalized: NormalizedPropsOptions[0] = {},
     needCastKeys: NormalizedPropsOptions[1] = []
   if (!isFunction(comp)) {
     // extend(normalized, raw)
@@ -194,7 +194,7 @@ export function normalizePropsOptions(
     }
   }
 
-  let res = [normalized, needCastKeys]
+  let res: NormalizedPropsOptions = [normalized, needCastKeys]
 
   return res
 }

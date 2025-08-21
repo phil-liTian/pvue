@@ -16,9 +16,15 @@ export const nodeOps: Omit<RenderOptions<any, any>, 'patchProp'> = {
     el.textContent = text
   },
 
+  setText: (node, text) => {
+    node.nodeValue = text
+  },
+
   insert(child, parent, anchor) {
     parent.insertBefore(child, anchor || null)
   },
 
   createText: text => doc.createTextNode(text),
+
+  createComment: text => doc.createComment(text),
 }

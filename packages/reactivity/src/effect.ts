@@ -91,6 +91,13 @@ export class ReactiveEffect<T = any> implements Subscriber {
     }
   }
 
+  /**
+   * @internal
+   */
+  runIfDirty() {
+    this.run()
+  }
+
   stop() {
     if (this.flags & EffectFlags.ACTIVE) {
       // active 的 effect才可以停止
