@@ -3,10 +3,19 @@
  * @Date: 2025-08-08 20:36:59
  */
 
-export { createVNode, isVNode, type VNode } from './vnode'
+export {
+  createVNode,
+  isVNode,
+  openBlock,
+  createBlock,
+  type VNode,
+  Fragment,
+} from './vnode'
 export { h } from './h'
 export { renderList } from './helpers/renderList'
 export { createSlots } from './helpers/createSlots'
+export { renderSlot } from './helpers/renderSlot'
+export { toHandlers } from './helpers/toHandlers'
 
 export { isClassComponent, type ClassComponent } from './component'
 
@@ -15,6 +24,7 @@ export { createRenderer, type RenderOptions } from './renderer'
 export { defineComponent } from './apiDefineComponent'
 
 export { onMounted, onErrorCaptured } from './apiLifecycle'
+export { setCurrentRenderingInstance, withCtx } from './componentRenderContext'
 
 export {} from './componentProps'
 

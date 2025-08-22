@@ -1,3 +1,7 @@
+/*
+ * @Author: phil
+ * @Date: 2025-08-20 13:35:35
+ */
 import { h, provide, inject } from 'pvue'
 
 const Child = {
@@ -18,7 +22,7 @@ const parent = {
   },
 }
 
-export const apiInject = {
+export const ApiInject = {
   name: 'apiInject',
 
   setup() {

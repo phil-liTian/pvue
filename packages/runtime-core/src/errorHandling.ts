@@ -2,6 +2,7 @@
  * @Author: phil
  * @Date: 2025-08-15 11:54:23
  */
+import { isArray, isFunction } from '@pvue/shared'
 import { ComponentInternalInstance } from './component'
 import { LifecycleHooks } from './enums'
 import { warn } from './warning'
@@ -65,6 +66,14 @@ export const ErrorTypeStrings: Record<ErrorTypes, string> = {
   [ErrorCodes.APP_UNMOUNT_CLEANUP]: 'app unmount cleanup function',
 }
 
+/**
+ * 调用函数并处理可能发生的错误
+ * @param fn 要调用的函数
+ * @param instance 组件实例
+ * @param type 错误类型
+ * @param args 可选的函数参数数组
+ * @returns 函数执行结果，如果出错则返回undefined
+ */
 export function callWithErrorHandling(
   fn: Function,
   instance: ComponentInternalInstance | null | undefined,
@@ -75,6 +84,27 @@ export function callWithErrorHandling(
     return args ? fn(...args) : fn()
   } catch (error) {
     handleError(error, instance, type)
+  }
+}
+
+export function callWithAsyncErrorHandling(
+  fn: Function | Function[],
+  instance: ComponentInternalInstance | null,
+  type: ErrorTypes,
+  args?: unknown[]
+): any {
+  if (isFunction(fn)) {
+    const res = callWithErrorHandling(fn, instance, type, args)
+    return res
+  }
+
+  if (isArray(fn)) {
+    let values: any[] = []
+    for (let i = 0; i < fn.length; i++) {
+      values.push(callWithAsyncErrorHandling(fn[i], instance, type, args))
+    }
+
+    return values
   }
 }
 

@@ -1,8 +1,10 @@
 import { isArray, isFunction, isObject, NOOP } from '@pvue/shared'
-import { ComponentInternalInstance } from './component'
+import { ComponentInternalInstance, LifecycleHook } from './component'
 import { onMounted } from './apiLifecycle'
 import { computed, isRef, reactive, warn } from '@pvue/reactivity'
 import { inject } from './apiInject'
+import { callWithAsyncErrorHandling } from './errorHandling'
+import { LifecycleHooks } from './enums'
 // 处理component的配置
 
 export type ComponentOptions = ComponentOptionsBase
@@ -12,6 +14,10 @@ interface LegacyOptions {
   inject?: any
   data?: () => any
   mounted?: () => any
+  created?: () => any
+
+  // componsition
+  mixins: any[]
 }
 
 export interface ComponentOptionsBase extends LegacyOptions {
@@ -42,6 +48,7 @@ export function applyOptions(instance: ComponentInternalInstance) {
     data: dataOptions,
     computed: computedOptions,
     inject: injectOptions,
+    created,
   } = options
   // vue2还有data配置 vue3已经不需要这个配置了
   if (dataOptions) {
@@ -101,6 +108,10 @@ export function applyOptions(instance: ComponentInternalInstance) {
     }
   }
 
+  if (created) {
+    callHook(created, instance, LifecycleHooks.CREATED)
+  }
+
   // 注册生命周期函数
   function registerLifecycleHook(
     register: Function,
@@ -116,7 +127,6 @@ export function applyOptions(instance: ComponentInternalInstance) {
 }
 
 function resolveInjections(injectOptions, ctx: any) {
-  console.log('injectOptions', injectOptions)
   for (const key in injectOptions) {
     const opt = injectOptions[key]
     let injected: unknown
@@ -131,4 +141,12 @@ function resolveInjections(injectOptions, ctx: any) {
       ctx[key] = injected
     }
   }
+}
+
+function callHook(
+  hook: Function,
+  instance: ComponentInternalInstance,
+  type: LifecycleHooks
+) {
+  callWithAsyncErrorHandling(hook.bind(instance.proxy), instance, type)
 }

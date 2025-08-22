@@ -18,6 +18,7 @@ export function renderComponentRoot(
     props,
     attrs,
     slots,
+    emit,
   } = instance
   let result
   setCurrentRenderingInstance(instance)
@@ -29,7 +30,7 @@ export function renderComponentRoot(
       // 函数组件
       const render = Component as FunctionalComponent
 
-      result = normalizeVNode(render(props, { attrs, slots }))
+      result = normalizeVNode(render(props, { attrs, slots, emit }))
     }
   } finally {
   }

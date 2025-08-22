@@ -99,8 +99,33 @@ export const camelize: (str: string) => string = cacheStringFunction(
 )
 
 const hyphenateRE = /\B([A-Z])/g
+
+/**
+ * @internal
+ * @description 将字符串中大写字母换成 （-小写字母）
+ */
 export const hyphenate: (str: string) => string = cacheStringFunction(
   (str: string) => str.replace(hyphenateRE, '-$1').toLowerCase()
+)
+
+/**
+ * @description 字符串转化成首字母大写的字符串
+ */
+export const capitalize: <T extends string>(str: T) => Capitalize<T> =
+  cacheStringFunction(<T extends string>(str: T) => {
+    return (str.charAt(0).toUpperCase() + str.slice(1)) as Capitalize<T>
+  })
+
+/**
+ * @description 将字符串转化成on开始的驼峰字符串
+ */
+export const toHandlerKey: <T extends string>(
+  str: T
+) => T extends '' ? '' : `on${Capitalize<T>}` = cacheStringFunction(
+  <T extends string>(str: T) => {
+    const s = str ? `on${capitalize(str)}` : ''
+    return s as T extends '' ? '' : `on${Capitalize<T>}`
+  }
 )
 
 export const extend: typeof Object.assign = Object.assign
@@ -121,4 +146,10 @@ export const def = (
     writable,
     value,
   })
+}
+
+export const looseToNumber = (val: any): any => {
+  const n = isString(val) ? Number(val) : NaN
+
+  return isNaN(n) ? val : n
 }

@@ -300,8 +300,6 @@ function assertType(value: unknown, type) {
 }
 
 function getType(ctor): string {
-  console.log('typeof ctor', typeof ctor, ctor)
-
   if (typeof ctor === 'function') {
     return ctor.name || ''
   }

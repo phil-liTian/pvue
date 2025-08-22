@@ -1,4 +1,10 @@
-import { h, createSlots } from 'pvue'
+/*
+ * @Author: phil
+ * @Date: 2025-08-21 20:43:00
+ */
+import { h, createSlots, renderSlot } from 'pvue'
+
+console.log('renderSlot', renderSlot)
 
 const Parent = {
   name: 'Parent',
@@ -11,7 +17,14 @@ const Parent = {
   setup(props, { slots }) {
     return () => {
       return h('div', {}, [
-        slots.header(),
+        // slots.header(),
+        renderSlot(
+          {
+            header: () => [h('div', {}, '我是header')],
+          },
+          'header',
+          { key: 'foo' }
+        ),
         h('div', { class: 'red' }, '我是父组件' + props.info),
         slots.default(),
       ])

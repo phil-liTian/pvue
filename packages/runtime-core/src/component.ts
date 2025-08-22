@@ -24,6 +24,11 @@ import {
 } from './componentProps'
 import { callWithErrorHandling, ErrorCodes } from './errorHandling'
 import { initSlots } from './componentSlots'
+import {
+  emit,
+  normalizeEmitsOptions,
+  ObjectEmitsOptions,
+} from './componentEmits'
 
 export type LifecycleHook<TFn = Function> = (TFn | SchedulerJob)[] | null
 
@@ -36,6 +41,7 @@ export interface ComponentInternalOptions {}
 export interface FunctionalComponent<P = {}> extends ComponentInternalOptions {
   (props: P, ctx: SetupContext): any
   props?: ComponentPropsOptions<P>
+  emits?: any
 }
 
 export type ConcreteComponent<Props = {}, RawBindings = any, D = any> =
@@ -44,6 +50,7 @@ export type ConcreteComponent<Props = {}, RawBindings = any, D = any> =
 export type SetupContext = {
   attrs: Data
   slots: Data
+  emit: Data
 }
 
 let uid = 0
@@ -90,6 +97,8 @@ export interface ComponentInternalInstance {
 
   propsOptions: NormalizedPropsOptions
 
+  emitsOptions: ObjectEmitsOptions | null
+
   emit: any
 
   // 生命周期函数
@@ -98,6 +107,12 @@ export interface ComponentInternalInstance {
   n?: () => Promise<void>
 
   isMounted: boolean
+
+  /**
+   * @internal
+   */
+
+  emitted: Record<string, boolean> | null
 }
 
 export interface ClassComponent {
@@ -139,6 +154,8 @@ export function createComponentInstance(
     // 处理组件可以接受的props配置
     propsOptions: normalizePropsOptions(type, appContext),
 
+    emitsOptions: normalizeEmitsOptions(type, appContext),
+
     emit: null!,
 
     m: null,
@@ -156,6 +173,7 @@ export function createComponentInstance(
   }
 
   instance.root = parent ? parent.root : instance
+  instance.emit = emit.bind(null, instance)
 
   return instance
 }
@@ -282,9 +300,10 @@ export const getComponentPublicInstance = (
 }
 
 export function createSetupContext(instance: ComponentInternalInstance) {
-  const { attrs, slots } = instance
+  const { attrs, slots, emit } = instance
   return {
     attrs,
     slots,
+    emit,
   }
 }
