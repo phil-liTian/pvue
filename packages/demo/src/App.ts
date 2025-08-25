@@ -7,10 +7,11 @@ import { ApiInject } from './examples/apiInject'
 import { Slots, Slots1 } from './examples/slots'
 import { RenderList } from './examples/renderList'
 import { ComponentEmits } from './examples/componentEmits'
+import { RendererElement } from './examples/rendererElement'
 
 export const App = {
   render() {
-    return h(ComponentEmits)
+    return h(RendererElement)
   },
 
   setup() {

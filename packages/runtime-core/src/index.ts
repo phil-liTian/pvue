@@ -3,6 +3,7 @@
  * @Date: 2025-08-08 20:36:59
  */
 
+export * from '@pvue/reactivity'
 export {
   createVNode,
   isVNode,

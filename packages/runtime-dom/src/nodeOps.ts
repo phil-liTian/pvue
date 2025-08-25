@@ -27,4 +27,11 @@ export const nodeOps: Omit<RenderOptions<any, any>, 'patchProp'> = {
   createText: text => doc.createTextNode(text),
 
   createComment: text => doc.createComment(text),
+
+  remove: child => {
+    const parent = child.parentNode
+    if (parent) {
+      parent.removeChild(child)
+    }
+  },
 }

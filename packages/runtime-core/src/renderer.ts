@@ -1,8 +1,9 @@
-import { isReservedProp, ShapeFlags } from '@pvue/shared'
+import { EMPTY_OBJ, isReservedProp, ShapeFlags } from '@pvue/shared'
 import { createAppAPI } from './apiCreateApp'
 import {
   type ComponentInternalInstance,
   createComponentInstance,
+  Data,
   setupComponent,
 } from './component'
 import {
@@ -31,6 +32,7 @@ export interface RenderOptions<HostNode, HostElement> {
   patchProp(el: HostElement, key: string, prevValue: any, nextValue: any): void
   createText(text: string): HostNode
   createComment(text: string): HostNode
+  remove(el: HostNode): void
 }
 
 export function createRenderer<HostNode, HostElement>(
@@ -48,6 +50,7 @@ function baseCreateRenderer(options) {
     patchProp: hostPatchProp,
     createText: hostCreateText,
     createComment: hostCreateComment,
+    remove: hostRemove,
   } = options
 
   // 处理component
@@ -91,6 +94,30 @@ function baseCreateRenderer(options) {
     effect.scheduler = () => queueJob(job)
 
     update()
+  }
+
+  function patchProps(el: RendererElement, oldProps: Data, newProps: Data) {
+    // 更新props
+    if (oldProps !== newProps) {
+      // if (oldProps !== EMPTY_OBJ) {
+      //   for (const key in oldProps) {
+      //     if (!(key in newProps)) {
+      //       // hostPatchProp()
+      //     }
+      //   }
+      // }
+
+      // 新的prop跟老的prop不同则更新
+
+      for (const key in newProps) {
+        if (isReservedProp(key)) continue
+        const next = newProps[key]
+        const prev = oldProps[key]
+        if (next !== prev && key !== 'value') {
+          hostPatchProp(el, key, prev, next)
+        }
+      }
+    }
   }
 
   const mountComponent = (initialVNode, container, parentComponent) => {
@@ -137,8 +164,22 @@ function baseCreateRenderer(options) {
     }
   }
 
-  const processElement = (vnode, container) => {
-    mountElement(vnode, container)
+  const processElement = (n1: VNode | null, n2: VNode, container) => {
+    if (n1 == null) {
+      mountElement(n2, container)
+    } else {
+      // 更新element
+      patchElement(n1, n2, container)
+    }
+  }
+
+  function patchElement(n1, n2, container) {
+    const el = (n2.el = n1.el)
+    const oldProps = n1.props || EMPTY_OBJ
+    const newProps = n2.props || EMPTY_OBJ
+    patchChildren(n1, n2, container)
+
+    patchProps(el, oldProps, newProps)
   }
 
   function processText(n1: VNode | null, n2: VNode, container) {
@@ -170,7 +211,6 @@ function baseCreateRenderer(options) {
   function patchChildren(n1: VNode, n2: VNode, container) {
     const c1 = n1 && n1.children
     const c2 = n2.children
-    const { shapeFlag } = n2
 
     patchKeyedChildren(c1, c2, container)
   }
@@ -199,6 +239,12 @@ function baseCreateRenderer(options) {
     container,
     parentComponent: ComponentInternalInstance | null = null
   ) => {
+    // 如果n1 和 n2 类型不同 则直接移除原来的dom结构
+    if (n1 && !isSameVNodeType(n1, n2)) {
+      unmount(n1, parentComponent)
+      n1 = null
+    }
+
     const { shapeFlag, type } = n2
 
     switch (type) {
@@ -215,13 +261,33 @@ function baseCreateRenderer(options) {
         if (shapeFlag & ShapeFlags.COMPONENT) {
           processComponent(n2, container, parentComponent)
         } else if (shapeFlag & ShapeFlags.ELEMENT) {
-          processElement(n2, container)
+          processElement(n1, n2, container)
         }
     }
   }
 
-  const render = (vnode, rootContainer) => {
-    patch(null, vnode, rootContainer)
+  const unmount = (vnode, parentComponent) => {
+    remove(vnode)
+  }
+
+  function remove(vnode) {
+    const { el } = vnode
+
+    if (vnode.shapeFlag & ShapeFlags.ELEMENT) {
+    }
+
+    const performRemove = () => {
+      hostRemove(el)
+    }
+
+    performRemove()
+  }
+
+  const render = (vnode, container) => {
+    patch(container._vnode || null, vnode, container)
+
+    // 多次执行render函数 如果vnode不同 则 需要移除之前的vnode
+    container._vnode = vnode
   }
 
   // let hydrate: null = null
