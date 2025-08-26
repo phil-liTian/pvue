@@ -44,7 +44,9 @@ export {
   type MaybeRefOrGetter,
 } from './ref'
 
-export { ReactiveFlags } from './constants'
+export { trigger } from './dep'
+
+export { ReactiveFlags, TriggerOpTypes } from './constants'
 
 export { warn } from './warning'
 

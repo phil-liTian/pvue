@@ -23,6 +23,7 @@ interface LegacyOptions {
 export interface ComponentOptionsBase extends LegacyOptions {
   render?: Function
   setup?: Function
+  inheritAttrs?: boolean
 }
 
 export type MergedComponentOptions = ComponentOptions

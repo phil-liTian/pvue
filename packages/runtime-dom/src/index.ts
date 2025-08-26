@@ -19,4 +19,8 @@ export const createApp = (...args: any[]) => {
   return app
 }
 
+export const render = (vnode: any, container: any) => {
+  ensureRenderer().render(vnode, container)
+}
+
 export * from '@pvue/runtime-core'

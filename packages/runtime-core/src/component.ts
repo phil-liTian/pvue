@@ -65,6 +65,7 @@ export interface ComponentInternalInstance {
   root: ComponentInternalInstance
   parent: ComponentInternalInstance | null
   render?: Function
+  update: () => void
 
   /**
    * @inernal 上下文对象, 返回组件实例, 用在PublicInstanceProxyHandlers组件代理对象中
@@ -103,6 +104,7 @@ export interface ComponentInternalInstance {
 
   // 生命周期函数
   [LifecycleHooks.MOUNTED]: LifecycleHook
+  [LifecycleHooks.UPDATED]: LifecycleHook
 
   n?: () => Promise<void>
 
@@ -112,7 +114,15 @@ export interface ComponentInternalInstance {
    * @internal
    */
 
-  emitted: Record<string, boolean> | null
+  emitted?: Record<string, boolean> | null
+
+  /**
+   * @internal
+   */
+  next: VNode | null
+
+  // 是否继承attrs的属性
+  inheritAttrs?: Boolean
 }
 
 export interface ClassComponent {
@@ -159,12 +169,19 @@ export function createComponentInstance(
     emit: null!,
 
     m: null,
+    u: null,
 
     setupContext: null,
     provides: parent ? parent.provides : Object.create(appContext.provides),
 
     // 标识组件是否已挂载
     isMounted: false,
+
+    inheritAttrs: type.inheritAttrs,
+
+    update: null!,
+
+    next: null!,
   }
   if (__DEV__) {
     instance.ctx = createDevRenderContext(instance)

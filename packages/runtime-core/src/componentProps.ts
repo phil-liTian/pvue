@@ -16,7 +16,12 @@ import {
 import { ComponentInternalInstance, ConcreteComponent, Data } from './component'
 import { warn } from './warning'
 import { AppContext } from './apiCreateApp'
-import { shallowReactive, toRaw } from '@pvue/reactivity'
+import {
+  shallowReactive,
+  toRaw,
+  trigger,
+  TriggerOpTypes,
+} from '@pvue/reactivity'
 import { createInternalObject } from './internalObject'
 
 export type ComponentPropsOptions<P = Data> =
@@ -110,6 +115,7 @@ function setFullProps(
   attrs: Data
 ) {
   const [options, needCastKeys] = instance.propsOptions
+  let hasAttrsChanged = false
   let rawCastValues: Data | undefined
   for (const key in rawProps) {
     const value = rawProps[key]
@@ -123,6 +129,7 @@ function setFullProps(
     } else {
       if (!(key in attrs) || value !== attrs[key]) {
         attrs[key] = value
+        hasAttrsChanged = true
       }
     }
   }
@@ -142,6 +149,8 @@ function setFullProps(
       )
     }
   }
+
+  return hasAttrsChanged
 }
 
 export function normalizePropsOptions(
@@ -310,3 +319,25 @@ function getType(ctor): string {
 const isSimpleType = /*@__PURE__*/ makeMap(
   'String,Number,Boolean,Function,Symbol,BigInt'
 )
+
+export function updateProps(
+  instance: ComponentInternalInstance,
+  rawProps: Data | null,
+  rawPrevProps: Data | null
+) {
+  const { attrs, props } = instance
+
+  let hasAttrsChanged = false
+
+  // for (const key in attrs) {
+
+  // }
+
+  if (setFullProps(instance, rawProps, props, attrs)) {
+    hasAttrsChanged = true
+  }
+
+  if (hasAttrsChanged) {
+    trigger(instance.attrs, TriggerOpTypes.SET)
+  }
+}

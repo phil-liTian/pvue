@@ -24,10 +24,12 @@ export { createRenderer, type RenderOptions } from './renderer'
 
 export { defineComponent } from './apiDefineComponent'
 
-export { onMounted, onErrorCaptured } from './apiLifecycle'
+export { onMounted, onUpdated, onErrorCaptured } from './apiLifecycle'
 export { setCurrentRenderingInstance, withCtx } from './componentRenderContext'
 
 export {} from './componentProps'
+
+export { callWithAsyncErrorHandling, ErrorCodes } from './errorHandling'
 
 export { provide, inject } from './apiInject'
 

@@ -13,5 +13,8 @@ export default defineConfig({
   test: {
     globals: true,
     setupFiles: 'scripts/setup-vitest.ts',
+    environmentMatchGlobs: [
+      ['packages/{pvue,vue-compat,runtime-dom}/**', 'jsdom'],
+    ],
   },
 })

@@ -8,10 +8,11 @@ import { Slots, Slots1 } from './examples/slots'
 import { RenderList } from './examples/renderList'
 import { ComponentEmits } from './examples/componentEmits'
 import { RendererElement } from './examples/rendererElement'
+import { RendererAttrsFallthrough } from './examples/rendererAttrsFallthrough'
 
 export const App = {
   render() {
-    return h(RendererElement)
+    return h(RendererAttrsFallthrough)
   },
 
   setup() {

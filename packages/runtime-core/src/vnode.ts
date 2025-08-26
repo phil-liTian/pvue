@@ -2,6 +2,7 @@ import { ReactiveFlags, warn } from '@pvue/reactivity'
 import { RendererElement } from './renderer'
 import {
   ClassComponent,
+  ComponentInternalInstance,
   Data,
   isClassComponent,
   type Component,
@@ -51,6 +52,7 @@ export interface VNode<
   patchFlag: PatchFlags
   shapeFlag: ShapeFlags
   children: VNodeNormalizedChildren
+  component: ComponentInternalInstance | null
 
   // DOM
   el: HostNode | null
@@ -118,6 +120,7 @@ export function cloneVNode(
     el: vnode.el,
     dynamicChildren: vnode.dynamicChildren,
     appContext: vnode.appContext,
+    component: null,
   }
 
   return cloned

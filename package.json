@@ -11,6 +11,7 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
+    "jsdom": "^26.1.0",
     "rollup": "^4.46.2",
     "vitest": "^3.1.4"
   },

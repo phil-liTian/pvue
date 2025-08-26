@@ -14,9 +14,18 @@ import {
   Fragment,
   isSameVNodeType,
 } from './vnode'
-import { renderComponentRoot } from './componentRenderUtils'
+import {
+  renderComponentRoot,
+  shouldUpdateComponent,
+} from './componentRenderUtils'
 import { ReactiveEffect } from '@pvue/reactivity'
-import { queueJob, SchedulerJob } from './scheduler'
+import {
+  queueJob,
+  queuePostFlushCb,
+  SchedulerJob,
+  SchedulerJobs,
+} from './scheduler'
+import { updateProps } from './componentProps'
 
 export interface RendererNode {
   [key: string | symbol]: any
@@ -29,11 +38,20 @@ export interface RenderOptions<HostNode, HostElement> {
   setElementText: (node: HostElement, text: string) => void
   setText: (node: HostElement, text: string) => void
   insert(el: HostNode, parent: HostElement, anchor?: HostNode | null): void
-  patchProp(el: HostElement, key: string, prevValue: any, nextValue: any): void
+  patchProp(
+    el: HostElement,
+    key: string,
+    prevValue: any,
+    nextValue: any,
+    parentComponent?: ComponentInternalInstance | null
+  ): void
   createText(text: string): HostNode
   createComment(text: string): HostNode
   remove(el: HostNode): void
 }
+
+export const queuePostRenderEffect: (fn: SchedulerJobs) => void =
+  queuePostFlushCb
 
 export function createRenderer<HostNode, HostElement>(
   options: RenderOptions<HostNode, HostElement>
@@ -53,6 +71,15 @@ function baseCreateRenderer(options) {
     remove: hostRemove,
   } = options
 
+  function updateComponentPreRender(
+    instance: ComponentInternalInstance,
+    nextVNode: VNode
+  ) {
+    const prevProps = instance.vnode.props
+
+    updateProps(instance, nextVNode.props, prevProps)
+  }
+
   // 处理component
   const setupRenderEffect = (
     instance: ComponentInternalInstance,
@@ -65,26 +92,37 @@ function baseCreateRenderer(options) {
 
         if (m) {
           // @ts-ignore
-          m.forEach(v => v())
+          queuePostRenderEffect(m)
         }
         // 不涉及到更新操作
         patch(null, subTree, container, instance)
 
         instance.isMounted = true
       } else {
+        const { u, next } = instance
+
+        if (next) {
+          updateComponentPreRender(instance, next)
+        }
+
         // 原来组件的tree
         const prevTree = instance.subTree
         // 更新后的组件的tree
         const nextTree = renderComponentRoot(instance)
 
         instance.subTree = nextTree
+
         patch(prevTree, nextTree, container, instance)
+
+        if (u) {
+          queuePostRenderEffect(u)
+        }
       }
     }
 
     const effect = new ReactiveEffect(componentUpdateFn)
 
-    const update = effect.run.bind(effect)
+    const update = (instance.update = effect.run.bind(effect))
 
     const job: SchedulerJob = effect.runIfDirty.bind(effect)
     job.id = instance.uuid
@@ -96,7 +134,12 @@ function baseCreateRenderer(options) {
     update()
   }
 
-  function patchProps(el: RendererElement, oldProps: Data, newProps: Data) {
+  function patchProps(
+    el: RendererElement,
+    oldProps: Data,
+    newProps: Data,
+    parentComponent
+  ) {
     // 更新props
     if (oldProps !== newProps) {
       // if (oldProps !== EMPTY_OBJ) {
@@ -114,22 +157,44 @@ function baseCreateRenderer(options) {
         const next = newProps[key]
         const prev = oldProps[key]
         if (next !== prev && key !== 'value') {
-          hostPatchProp(el, key, prev, next)
+          hostPatchProp(el, key, prev, next, parentComponent)
         }
       }
     }
   }
 
   const mountComponent = (initialVNode, container, parentComponent) => {
-    const instance = createComponentInstance(initialVNode, parentComponent)
+    const instance = (initialVNode.component = createComponentInstance(
+      initialVNode,
+      parentComponent
+    ))
 
     setupComponent(instance)
 
     setupRenderEffect(instance, container)
   }
 
-  const processComponent = (vnode, container, parentComponent) => {
-    mountComponent(vnode, container, parentComponent)
+  function updateComponent(n1: VNode, n2: VNode) {
+    const instance = (n2.component = n1.component)!
+
+    if (shouldUpdateComponent(n1, n2)) {
+      instance.next = n2
+      instance.update()
+    }
+  }
+
+  const processComponent = (
+    n1: VNode | null,
+    n2: VNode,
+    container,
+    parentComponent
+  ) => {
+    if (n1 == null) {
+      mountComponent(n2, container, parentComponent)
+    } else {
+      // 更新
+      updateComponent(n1, n2)
+    }
   }
 
   // 处理element
@@ -144,7 +209,6 @@ function baseCreateRenderer(options) {
       // 处理array类型的children
       mountChildren(children, el)
     }
-
     if (props) {
       for (const key in props) {
         if (key !== 'value' && !isReservedProp(key)) {
@@ -164,22 +228,27 @@ function baseCreateRenderer(options) {
     }
   }
 
-  const processElement = (n1: VNode | null, n2: VNode, container) => {
+  const processElement = (
+    n1: VNode | null,
+    n2: VNode,
+    container,
+    parentContainer
+  ) => {
     if (n1 == null) {
       mountElement(n2, container)
     } else {
       // 更新element
-      patchElement(n1, n2, container)
+      patchElement(n1, n2, container, parentContainer)
     }
   }
 
-  function patchElement(n1, n2, container) {
+  function patchElement(n1, n2, parentComponent, container) {
     const el = (n2.el = n1.el)
     const oldProps = n1.props || EMPTY_OBJ
     const newProps = n2.props || EMPTY_OBJ
     patchChildren(n1, n2, container)
 
-    patchProps(el, oldProps, newProps)
+    patchProps(el, oldProps, newProps, parentComponent)
   }
 
   function processText(n1: VNode | null, n2: VNode, container) {
@@ -259,9 +328,9 @@ function baseCreateRenderer(options) {
         break
       default:
         if (shapeFlag & ShapeFlags.COMPONENT) {
-          processComponent(n2, container, parentComponent)
+          processComponent(n1, n2, container, parentComponent)
         } else if (shapeFlag & ShapeFlags.ELEMENT) {
-          processElement(n1, n2, container)
+          processElement(n1, n2, container, parentComponent)
         }
     }
   }

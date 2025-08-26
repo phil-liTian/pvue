@@ -3,8 +3,12 @@
  * @Date: 2025-08-12 17:39:11
  */
 import { ShapeFlags } from '@pvue/shared'
-import { ComponentInternalInstance, FunctionalComponent } from './component'
-import { normalizeVNode, VNode } from './vnode'
+import {
+  ComponentInternalInstance,
+  Data,
+  FunctionalComponent,
+} from './component'
+import { cloneVNode, normalizeVNode, VNode } from './vnode'
 import { setCurrentRenderingInstance } from './componentRenderContext'
 
 export function renderComponentRoot(
@@ -19,13 +23,17 @@ export function renderComponentRoot(
     attrs,
     slots,
     emit,
+    inheritAttrs,
   } = instance
   let result
+  // 属性
+  let fallthroughAttrs
   setCurrentRenderingInstance(instance)
   try {
     if (vnode.shapeFlag & ShapeFlags.STATEFUL_COMPONENT) {
       // 对象组件
       result = normalizeVNode(render?.call(proxy))
+      fallthroughAttrs = attrs
     } else {
       // 函数组件
       const render = Component as FunctionalComponent
@@ -35,5 +43,29 @@ export function renderComponentRoot(
   } finally {
   }
 
-  return result
+  let root = result
+  if (inheritAttrs !== false && fallthroughAttrs) {
+    const keys = Object.keys(fallthroughAttrs)
+    if (keys.length) {
+      root = cloneVNode(root, fallthroughAttrs)
+    }
+  }
+  return root
+}
+
+export function shouldUpdateComponent(prevVNode: VNode, nextVNode: VNode) {
+  const { props: prevProps } = prevVNode
+  const { props: nextProps } = nextVNode
+  return hasPropsChanged(prevProps, nextProps)
+}
+
+function hasPropsChanged(prevProps: Data, nextProps: Data) {
+  const nextKeys = Reflect.ownKeys(nextProps)
+
+  for (let i = 0; i < nextKeys.length; i++) {
+    const key = nextKeys[i] as string
+    if (prevProps[key] !== nextProps[key]) {
+      return true
+    }
+  }
 }

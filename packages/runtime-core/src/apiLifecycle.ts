@@ -31,6 +31,7 @@ type CreateHook<T = any> = (
 ) => void
 
 export const onMounted: CreateHook = createHook(LifecycleHooks.MOUNTED)
+export const onUpdated: CreateHook = createHook(LifecycleHooks.UPDATED)
 
 export type ErrorCapturedHook<TERROR = unknown> = (
   err: TERROR,
