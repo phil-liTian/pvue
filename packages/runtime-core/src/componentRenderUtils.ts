@@ -10,6 +10,7 @@ import {
 } from './component'
 import { cloneVNode, normalizeVNode, VNode } from './vnode'
 import { setCurrentRenderingInstance } from './componentRenderContext'
+import { warn } from './warning'
 
 export function renderComponentRoot(
   instance: ComponentInternalInstance
@@ -32,7 +33,22 @@ export function renderComponentRoot(
   try {
     if (vnode.shapeFlag & ShapeFlags.STATEFUL_COMPONENT) {
       // 对象组件
-      result = normalizeVNode(render?.call(proxy))
+      const proxyToUse = proxy
+      const thisProxy = __DEV__
+        ? new Proxy(proxyToUse!, {
+            get(target, key, receiver) {
+              warn(
+                `Property '${String(
+                  key
+                )}' was accessed via 'this'. Avoid using 'this' in templates.`
+              )
+
+              return Reflect.get(target, key, receiver)
+            },
+          })
+        : proxyToUse
+
+      result = normalizeVNode(render?.call(thisProxy))
       fallthroughAttrs = attrs
     } else {
       // 函数组件

@@ -12,7 +12,7 @@ import { RendererAttrsFallthrough } from './examples/rendererAttrsFallthrough'
 
 export const App = {
   render() {
-    return h(RendererAttrsFallthrough)
+    return h(ApiInject)
   },
 
   setup() {

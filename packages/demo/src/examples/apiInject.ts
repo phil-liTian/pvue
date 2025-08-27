@@ -17,7 +17,7 @@ const parent = {
   setup() {
     provide('msg', 'parent')
     return () => {
-      return h(Child)
+      return [h(Child)]
     }
   },
 }

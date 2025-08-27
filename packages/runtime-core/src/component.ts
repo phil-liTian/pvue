@@ -66,6 +66,7 @@ export interface ComponentInternalInstance {
   parent: ComponentInternalInstance | null
   render?: Function
   update: () => void
+  job: SchedulerJob
 
   /**
    * @inernal 上下文对象, 返回组件实例, 用在PublicInstanceProxyHandlers组件代理对象中
@@ -180,6 +181,7 @@ export function createComponentInstance(
     inheritAttrs: type.inheritAttrs,
 
     update: null!,
+    job: null!,
 
     next: null!,
   }

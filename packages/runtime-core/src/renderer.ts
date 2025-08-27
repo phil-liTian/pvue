@@ -143,7 +143,7 @@ function baseCreateRenderer(options) {
 
     const update = (instance.update = effect.run.bind(effect))
 
-    const job: SchedulerJob = effect.runIfDirty.bind(effect)
+    const job: SchedulerJob = (instance.job = effect.runIfDirty.bind(effect))
     job.id = instance.uuid
     job.i = instance
 
@@ -219,7 +219,7 @@ function baseCreateRenderer(options) {
   }
 
   // 处理element
-  const mountElement = (vnode: VNode, container) => {
+  const mountElement = (vnode: VNode, container, parentComponent) => {
     const { shapeFlag, children, props } = vnode
 
     let el = (vnode.el = hostCreateElement(vnode.type))
@@ -228,7 +228,7 @@ function baseCreateRenderer(options) {
       hostSetElementText(el, children)
     } else if (shapeFlag & ShapeFlags.ARRAY_CHILDREN) {
       // 处理array类型的children
-      mountChildren(children, el)
+      mountChildren(children, el, parentComponent)
     }
     if (props) {
       for (const key in props) {
@@ -241,11 +241,11 @@ function baseCreateRenderer(options) {
     hostInsert(el, container)
   }
 
-  function mountChildren(children, container) {
+  function mountChildren(children, container, parentComponent) {
     for (let i = 0; i < children.length; i++) {
       const child = normalizeVNode(children[i])
 
-      patch(null, child, container)
+      patch(null, child, container, parentComponent)
     }
   }
 
@@ -253,13 +253,13 @@ function baseCreateRenderer(options) {
     n1: VNode | null,
     n2: VNode,
     container,
-    parentContainer
+    parentComponent
   ) => {
     if (n1 == null) {
-      mountElement(n2, container)
+      mountElement(n2, container, parentComponent)
     } else {
       // 更新element
-      patchElement(n1, n2, container, parentContainer)
+      patchElement(n1, n2, container, parentComponent)
     }
   }
 
@@ -289,9 +289,14 @@ function baseCreateRenderer(options) {
     }
   }
 
-  function processFragment(n1: VNode | null, n2: VNode, container) {
+  function processFragment(
+    n1: VNode | null,
+    n2: VNode,
+    container,
+    parentComponent
+  ) {
     if (n1 == null) {
-      mountChildren(n2.children, container)
+      mountChildren(n2.children, container, parentComponent)
     } else {
       // 处理children
       patchChildren(n1, n2, container)
@@ -345,7 +350,7 @@ function baseCreateRenderer(options) {
         processCommentNode(n1, n2, container)
         break
       case Fragment:
-        processFragment(n1, n2, container)
+        processFragment(n1, n2, container, parentComponent)
         break
       default:
         if (shapeFlag & ShapeFlags.COMPONENT) {
@@ -356,8 +361,36 @@ function baseCreateRenderer(options) {
     }
   }
 
+  function unmountComponent(instance: ComponentInternalInstance) {
+    const { job, subTree } = instance
+
+    if (job) {
+      unmount(subTree, instance)
+    }
+  }
+
+  function unmountChildren(
+    children: VNode[],
+    parentComponent: ComponentInternalInstance
+  ) {
+    for (let i = 0; i < children.length; i++) {
+      unmount(children[i], parentComponent)
+    }
+  }
+
   const unmount = (vnode, parentComponent) => {
-    remove(vnode)
+    const { shapeFlag, type, children } = vnode
+    console.log('shapeFlag-----', type)
+
+    if (shapeFlag & ShapeFlags.COMPONENT) {
+      unmountComponent(vnode.component)
+    } else {
+      if (type === Fragment) {
+        unmountChildren(children, parentComponent)
+      } else {
+        remove(vnode)
+      }
+    }
   }
 
   function remove(vnode) {
@@ -374,7 +407,11 @@ function baseCreateRenderer(options) {
   }
 
   const render = (vnode, container) => {
-    patch(container._vnode || null, vnode, container)
+    if (vnode == null) {
+      unmount(container._vnode, null)
+    } else {
+      patch(container._vnode || null, vnode, container)
+    }
 
     // 多次执行render函数 如果vnode不同 则 需要移除之前的vnode
     container._vnode = vnode
