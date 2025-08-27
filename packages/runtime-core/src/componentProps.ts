@@ -326,7 +326,8 @@ export function updateProps(
   rawPrevProps: Data | null
 ) {
   const { attrs, props } = instance
-
+  const [options] = instance.propsOptions
+  const rawCurrentProps = toRaw(props)
   let hasAttrsChanged = false
 
   // for (const key in attrs) {
@@ -337,7 +338,50 @@ export function updateProps(
     hasAttrsChanged = true
   }
 
-  if (hasAttrsChanged) {
-    trigger(instance.attrs, TriggerOpTypes.SET)
+  let kebabKey: string
+  for (const key in rawCurrentProps) {
+    // 删除不存在的属性
+    if (
+      !rawProps ||
+      (!hasOwn(rawProps, key) &&
+        ((kebabKey = hyphenate(key)) === key || !hasOwn(rawProps, kebabKey)))
+    ) {
+      if (options) {
+        // 如果之前有 但是现在没有的属性 在update的时候 需要将其删除
+        if (
+          rawPrevProps &&
+          (rawPrevProps[key] !== undefined ||
+            rawPrevProps[kebabKey!] !== undefined)
+        ) {
+          props[key] = resolvePropValue(
+            options!,
+            rawCurrentProps,
+            key,
+            undefined,
+            instance,
+            true
+          )
+        }
+      } else {
+        delete props[key]
+      }
+    }
   }
+
+  if (attrs !== rawCurrentProps) {
+    for (const key in attrs) {
+      if (
+        !rawProps ||
+        (!hasOwn(rawProps, key) &&
+          (!__COMPAT__ || !hasOwn(rawProps, key + 'Native')))
+      ) {
+        delete attrs[key]
+        hasAttrsChanged = true
+      }
+    }
+  }
+
+  // if (hasAttrsChanged) {
+  //   trigger(instance.attrs, TriggerOpTypes.SET)
+  // }
 }

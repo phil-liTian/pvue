@@ -54,8 +54,14 @@ export function renderComponentRoot(
 }
 
 export function shouldUpdateComponent(prevVNode: VNode, nextVNode: VNode) {
-  const { props: prevProps } = prevVNode
-  const { props: nextProps } = nextVNode
+  const { props: prevProps, children: prevChildren } = prevVNode
+  const { props: nextProps, children: nextChildren } = nextVNode
+  if (prevChildren || nextChildren) {
+    if (!nextChildren || !nextChildren.$stable) {
+      return true
+    }
+  }
+
   return hasPropsChanged(prevProps, nextProps)
 }
 

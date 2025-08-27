@@ -204,6 +204,7 @@ function createBaseVNode(
     el: null,
     dynamicChildren: null,
     appContext: null,
+    component: null,
   } as VNode
   if (needFullChildrenNormalization) {
     normalizeChildren(vnode, children)

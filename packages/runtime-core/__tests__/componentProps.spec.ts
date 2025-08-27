@@ -28,6 +28,7 @@ describe('component props', () => {
 
     // // test passing kebab-case and resolving to camelCase
     render(h(Comp, { 'foo-bar': 2, bar: 3, baz: 4 }), root)
+
     expect(proxy.fooBar).toBe(2)
     expect(props).toEqual({ fooBar: 2 })
     expect(attrs).toEqual({ bar: 3, baz: 4 })
@@ -115,6 +116,7 @@ describe('component props', () => {
     expect(props).toBe(attrs)
 
     render(h(Comp, { bar: 2 }), root)
+
     expect(props).toEqual({ bar: 2 })
     expect(attrs).toEqual({ bar: 2 })
     expect(props).toBe(attrs)

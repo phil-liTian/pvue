@@ -1,6 +1,18 @@
-import { def, IfAny, isArray, isFunction, ShapeFlags } from '@pvue/shared'
+import {
+  def,
+  EMPTY_OBJ,
+  IfAny,
+  isArray,
+  isFunction,
+  ShapeFlags,
+} from '@pvue/shared'
 import { ComponentInternalInstance, currentInstance } from './component'
-import { normalizeVNode, VNode, VNodeNormalizedChildren } from './vnode'
+import {
+  normalizeVNode,
+  VNode,
+  VNodeChild,
+  VNodeNormalizedChildren,
+} from './vnode'
 import { createInternalObject } from './internalObject'
 import { warn } from './warning'
 import { withCtx } from './componentRenderContext'
@@ -105,5 +117,38 @@ export const initSlots = (
     }
   } else if (children) {
     normalizeVNodeSlots(instance, children)
+  }
+}
+
+export function updateSlots(
+  instance: ComponentInternalInstance,
+  children: VNodeChild
+) {
+  const { vnode, slots } = instance
+  let needDeletionCheck = true
+  let deletionComparisonTarget = EMPTY_OBJ
+
+  if (vnode.shapeFlag & ShapeFlags.SLOTS_CHILDREN) {
+    const type = children._
+
+    if (type) {
+      assignSlots(slots, children)
+    } else {
+      normalizeObjectSlots(children, slots)
+    }
+
+    deletionComparisonTarget = children
+  } else if (children) {
+    normalizeVNodeSlots(instance, children)
+    // default 不需要删除了
+    needDeletionCheck = false
+  }
+
+  if (needDeletionCheck) {
+    for (const key in slots) {
+      if (deletionComparisonTarget[key] == null) {
+        delete slots[key]
+      }
+    }
   }
 }

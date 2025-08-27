@@ -26,6 +26,7 @@ import {
   SchedulerJobs,
 } from './scheduler'
 import { updateProps } from './componentProps'
+import { updateSlots } from './componentSlots'
 
 export interface RendererNode {
   [key: string | symbol]: any
@@ -75,14 +76,25 @@ function baseCreateRenderer(options) {
     instance: ComponentInternalInstance,
     nextVNode: VNode
   ) {
+    // nextVNode.component = instance
+
+    // instance 是原来的组件对象 nextVNode 是现在更新的目标对象
     const prevProps = instance.vnode.props
 
+    // STAR: 更新的时候一定要将组件实例的vnode更新成最新的vnode, 否则每次更新都要首次创建的组件实例做比较, 会出现该删除的属性 没有正常删除的bug
+    instance.vnode = nextVNode
+
+    // 更新props
     updateProps(instance, nextVNode.props, prevProps)
+
+    // 更新slots
+    updateSlots(instance, nextVNode.children)
   }
 
   // 处理component
   const setupRenderEffect = (
     instance: ComponentInternalInstance,
+    initialVNode,
     container
   ) => {
     const componentUpdateFn = () => {
@@ -96,13 +108,18 @@ function baseCreateRenderer(options) {
         }
         // 不涉及到更新操作
         patch(null, subTree, container, instance)
-
+        // 标识已经挂载了
         instance.isMounted = true
+
+        // 组件类型的el 是 subTree 渲染出来的el
+        initialVNode.el = subTree.el
       } else {
-        const { u, next } = instance
+        let { u, next, vnode } = instance
 
         if (next) {
           updateComponentPreRender(instance, next)
+        } else {
+          next = vnode
         }
 
         // 原来组件的tree
@@ -117,6 +134,8 @@ function baseCreateRenderer(options) {
         if (u) {
           queuePostRenderEffect(u)
         }
+
+        next.el = nextTree.el
       }
     }
 
@@ -171,7 +190,7 @@ function baseCreateRenderer(options) {
 
     setupComponent(instance)
 
-    setupRenderEffect(instance, container)
+    setupRenderEffect(instance, initialVNode, container)
   }
 
   function updateComponent(n1: VNode, n2: VNode) {
@@ -180,6 +199,8 @@ function baseCreateRenderer(options) {
     if (shouldUpdateComponent(n1, n2)) {
       instance.next = n2
       instance.update()
+    } else {
+      console.log('asda')
     }
   }
 
