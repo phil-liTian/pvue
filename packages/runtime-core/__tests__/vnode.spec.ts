@@ -18,6 +18,8 @@ import {
 } from '../src/vnode'
 import { PatchFlags, ShapeFlags } from '@pvue/shared'
 import { Data } from '../src/component'
+import { nodeOps } from '@pvue/runtime-test'
+import { createApp, isReactive, reactive } from '@pvue/runtime-dom'
 
 describe('vnode', () => {
   test('create with just tag', () => {

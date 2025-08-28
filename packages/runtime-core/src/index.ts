@@ -6,6 +6,8 @@
 export * from '@pvue/reactivity'
 export {
   createVNode,
+  createTextVNode,
+  createCommentVNode,
   isVNode,
   openBlock,
   createBlock,

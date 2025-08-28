@@ -127,7 +127,7 @@ export function cloneVNode(
 }
 
 function _createVNode(
-  type: VNodeTypes | ClassComponent | typeof Fragment | typeof Text,
+  type: VNodeTypes | ClassComponent | any,
   props: Data | null = null,
   children: unknown = null,
   patchFlag: number = 0
@@ -241,6 +241,14 @@ export function isVNode(value): value is VNode {
 
 export function cloneIfMounted(child: VNode): VNode {
   return child.el === null ? child : cloneVNode(child)
+}
+
+export function createTextVNode(text, flag: number = 0) {
+  return createVNode(Text, null, text)
+}
+
+export function createCommentVNode(text = '') {
+  return createVNode(Comment, null, text)
 }
 
 export function normalizeVNode(child: VNodeChild): VNode {

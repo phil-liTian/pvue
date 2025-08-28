@@ -1,4 +1,10 @@
-import { EMPTY_OBJ, isReservedProp, ShapeFlags } from '@pvue/shared'
+import {
+  EMPTY_ARR,
+  EMPTY_OBJ,
+  isReservedProp,
+  PatchFlags,
+  ShapeFlags,
+} from '@pvue/shared'
 import { createAppAPI } from './apiCreateApp'
 import {
   type ComponentInternalInstance,
@@ -219,7 +225,7 @@ function baseCreateRenderer(options) {
   }
 
   // 处理element
-  const mountElement = (vnode: VNode, container, parentComponent) => {
+  const mountElement = (vnode: VNode, container, parentComponent, anchor) => {
     const { shapeFlag, children, props } = vnode
 
     let el = (vnode.el = hostCreateElement(vnode.type))
@@ -238,14 +244,20 @@ function baseCreateRenderer(options) {
       }
     }
 
-    hostInsert(el, container)
+    hostInsert(el, container, anchor)
   }
 
-  function mountChildren(children, container, parentComponent) {
-    for (let i = 0; i < children.length; i++) {
+  function mountChildren(
+    children,
+    container,
+    parentComponent,
+    anchor = null,
+    start = 0
+  ) {
+    for (let i = start; i < children.length; i++) {
       const child = normalizeVNode(children[i])
 
-      patch(null, child, container, parentComponent)
+      patch(null, child, container, parentComponent, anchor)
     }
   }
 
@@ -253,13 +265,14 @@ function baseCreateRenderer(options) {
     n1: VNode | null,
     n2: VNode,
     container,
-    parentComponent
+    parentComponent,
+    anchor
   ) => {
     if (n1 == null) {
-      mountElement(n2, container, parentComponent)
+      mountElement(n2, container, parentComponent, anchor)
     } else {
       // 更新element
-      patchElement(n1, n2, container, parentComponent)
+      patchElement(n1, n2, parentComponent, container)
     }
   }
 
@@ -267,14 +280,15 @@ function baseCreateRenderer(options) {
     const el = (n2.el = n1.el)
     const oldProps = n1.props || EMPTY_OBJ
     const newProps = n2.props || EMPTY_OBJ
-    patchChildren(n1, n2, container)
+    // STAR: 注意这里的容器是el
+    patchChildren(n1, n2, el, parentComponent)
 
     patchProps(el, oldProps, newProps, parentComponent)
   }
 
-  function processText(n1: VNode | null, n2: VNode, container) {
+  function processText(n1: VNode | null, n2: VNode, container, anchor = null) {
     if (n1 == null) {
-      hostInsert((n2.el = hostCreateText(n2.children)), container)
+      hostInsert((n2.el = hostCreateText(n2.children)), container, anchor)
     } else {
       const el = (n2.el = n1.el)
       if (n1.children !== n2.children) {
@@ -283,9 +297,9 @@ function baseCreateRenderer(options) {
     }
   }
 
-  function processCommentNode(n1, n2, container) {
+  function processCommentNode(n1, n2, container, anchor) {
     if (n1 == null) {
-      hostInsert(hostCreateComment(n2.children || ''), container)
+      hostInsert(hostCreateComment(n2.children || ''), container, anchor)
     }
   }
 
@@ -293,46 +307,273 @@ function baseCreateRenderer(options) {
     n1: VNode | null,
     n2: VNode,
     container,
-    parentComponent
+    parentComponent,
+    anchor
   ) {
+    const { patchFlag, dynamicChildren } = n2
+    const fragmentStartAnchor = (n2.el = n1 ? n1.el : hostCreateText(''))
+    const fragmentEndAnchor = hostCreateText('')
     if (n1 == null) {
-      mountChildren(n2.children, container, parentComponent)
+      hostInsert(fragmentStartAnchor, container, anchor)
+      hostInsert(fragmentEndAnchor, container, anchor)
+
+      mountChildren(
+        n2.children || [], // empty fragment
+        container,
+        parentComponent,
+        fragmentEndAnchor
+      )
     } else {
-      // 处理children
-      patchChildren(n1, n2, container)
+      if (patchFlag & PatchFlags.STABLE_FRAGMENT) {
+        patchBlockChildren(
+          n1.dynamicChildren,
+          dynamicChildren,
+          container,
+          parentComponent
+        )
+      } else {
+        // 处理children
+        patchChildren(n1, n2, container, parentComponent)
+      }
     }
   }
 
-  function patchChildren(n1: VNode, n2: VNode, container) {
+  function patchBlockChildren(
+    oldChildren,
+    newChildren,
+    container,
+    parentComponent
+  ) {
+    console.log('oldChildren, newChildren', oldChildren.length)
+    for (let i = 0; i < newChildren.length; i++) {
+      const newVNode = newChildren[i]
+      const oldVNode = oldChildren[i]
+      // console.log('oldVNode', oldVNode, newVNode)
+    }
+  }
+
+  function patchChildren(
+    n1: VNode,
+    n2: VNode,
+    container,
+    parentComponent,
+    anchor = null
+  ) {
     const c1 = n1 && n1.children
     const c2 = n2.children
 
-    patchKeyedChildren(c1, c2, container)
+    const { shapeFlag: prevShapeFlag } = n1
+    const { shapeFlag, patchFlag } = n2
+
+    if (patchFlag & PatchFlags.KEYED_FRAGMENT) {
+      patchKeyedChildren(c1, c2, container)
+      return
+    } else if (patchFlag & PatchFlags.UNKEYED_FRAGMENT) {
+      // UNKEYED_FRAGMENT
+      patchUnkeyedChildren(c1, c2, container, parentComponent, anchor)
+      return
+    }
+
+    // text-children => text-children
+    if (shapeFlag & ShapeFlags.TEXT_CHILDREN) {
+      if (prevShapeFlag & ShapeFlags.TEXT_CHILDREN) {
+        // 都是text
+        if (c1 !== c2) {
+          hostSetElementText(container, c2)
+        }
+      }
+    }
+
+    // text-chidlren => array-children
+    // array-children => text-children
+    // array-children => array-children
+
+    if (prevShapeFlag & ShapeFlags.ARRAY_CHILDREN) {
+      if (shapeFlag & ShapeFlags.ARRAY_CHILDREN) {
+        // 两个array类型的children进行比较 双端diff算法
+        patchKeyedChildren(c1, c2, container)
+      }
+    }
   }
 
-  function patchKeyedChildren(c1: VNode[], c2: VNode[], container) {
+  function patchUnkeyedChildren(c1, c2, container, parentComponent, anchor) {
+    c1 = c1 || EMPTY_ARR
+    c2 = c2 || EMPTY_ARR
+    const oldLength = c1.length
+    const newLength = c2.length
+    const commonLength = Math.min(oldLength, newLength)
+
+    let i
+    for (i = 0; i < commonLength; i++) {
+      const nextChild = c2[i]
+      patch(c1[i], nextChild, container)
+    }
+
+    if (oldLength > newLength) {
+      unmountChildren(c1, parentComponent, commonLength)
+    } else {
+      mountChildren(c2, container, parentComponent, anchor, commonLength)
+    }
+  }
+
+  /**
+   * 对比新旧虚拟DOM节点数组，进行高效的差异更新
+   * @param c1 旧虚拟DOM节点数组
+   * @param c2 新虚拟DOM节点数组
+   * @param container 容器元素
+   */
+  function patchKeyedChildren(
+    c1: VNode[],
+    c2: VNode[],
+    container,
+    parentAnchor = null
+  ) {
     let i = 0
     const l2 = c2.length
-    const e1 = c1.length - 1
-    const e2 = l2 - 1
+    let e1 = c1.length - 1
+    let e2 = l2 - 1
 
+    // 1. sync from start
+    // (a b) c
+    // (a b) d e
     while (i <= e1 && i <= e2) {
       const n1 = c1[i]
       const n2 = c2[i]
 
       if (isSameVNodeType(n1, n2)) {
         patch(n1, n2, container, null)
+      } else {
+        break
       }
 
       i++
     }
+
+    // 2. sync from end
+    // a (b c)
+    // d e (b c)
+    while (i <= e1 && i <= e2) {
+      const n1 = c1[e1]
+      const n2 = c2[e2]
+      if (isSameVNodeType(n1, n2)) {
+        patch(n1, n2, container, null)
+      } else {
+        break
+      }
+      e1--
+      e2--
+    }
+
+    // 3. common sequence + mount
+    // (a b)
+    // (a b) c
+    // i = 2, e1 = 1, e2 = 2
+    // (a b)
+    // c (a b)
+    // i = 0, e1 = -1, e2 = 0
+    if (i > e1) {
+      if (i <= e2) {
+        // 新的比老的多 需要新增
+        const nextPos = e2 + 1
+        const anchor = nextPos >= l2 ? parentAnchor : (c2[nextPos] as VNode).el
+
+        while (i <= e2) {
+          patch(null, c2[i], container, null, anchor)
+          i++
+        }
+      }
+    } else if (i > e2) {
+      // 4. common sequence + unmount
+      // (a b) c
+      // (a b)
+      // i = 2, e1 = 2, e2 = 1
+      // a (b c)
+      // (b c)
+      // i = 0, e1 = 0, e2 = -1
+      // 老的比新的多 删除老children中的vnode
+      // while(i<=e1) {
+      // }
+    } else {
+      // 5. unknown sequence
+      // [i ... e1 + 1]: a b [c d e] f g
+      // [i ... e2 + 1]: a b [e d c h] f g
+      // i = 2, e1 = 4, e2 = 5
+      let s1 = i // 原来数组的开始位置
+      let s2 = i // 新数组的的开始位置
+      // 记录在新数组中key对index的映射关系
+      const keyToNewIndexMap: Map<PropertyKey, number> = new Map()
+
+      for (let i = s2; i <= e2; i++) {
+        const nextChild = c2[i]
+
+        if (nextChild.key) {
+          keyToNewIndexMap.set(nextChild.key, i)
+        }
+      }
+
+      const toBePatched = e2 - s2 + 1
+      // 记录新数组在老数组中的位置
+      const newIndexToOldIndexMap = new Array(toBePatched).fill(0)
+
+      for (let i = s1; i <= e1; i++) {
+        const prevChild = c1[i]
+
+        let newIndex
+        if (prevChild.key !== null) {
+          newIndex = keyToNewIndexMap.get(prevChild.key)
+        }
+
+        newIndexToOldIndexMap[newIndex - s2] = i + 1
+
+        // 新老节点存在相同的key
+        if (newIndex !== undefined) {
+          patch(prevChild, c2[newIndex], container, null)
+        }
+      }
+
+      // 获取最长递增子序列
+      const increasingNewIndexSequence = getSequence(newIndexToOldIndexMap)
+
+      let j = increasingNewIndexSequence.length - 1
+      for (let i = toBePatched - 1; i >= 0; i--) {
+        const nextIndex = s2 + i
+        const nextChild = c2[nextIndex]
+        const anchorVNode = c2[nextIndex + 1]
+
+        const anchor = nextIndex + 1 < l2 ? anchorVNode.el : parentAnchor
+
+        if (j < 0 || i !== increasingNewIndexSequence[j]) {
+          // TODO move
+          move(nextChild, container, anchor)
+        } else {
+          j--
+        }
+      }
+    }
+  }
+
+  // 移动元素
+  const move = (vnode, container, anchor) => {
+    const { el, type, children } = vnode
+    console.log('el', el)
+
+    if (type === Fragment) {
+      hostInsert(el, container, anchor)
+      for (let i = 0; i < children.length; i++) {
+        move(children[i], container, anchor)
+      }
+      return
+    }
+
+    hostInsert(el, container, anchor)
   }
 
   const patch = (
     n1: VNode | null,
     n2: VNode,
     container,
-    parentComponent: ComponentInternalInstance | null = null
+    parentComponent: ComponentInternalInstance | null = null,
+    anchor: any = null
   ) => {
     // 如果n1 和 n2 类型不同 则直接移除原来的dom结构
     if (n1 && !isSameVNodeType(n1, n2)) {
@@ -344,19 +585,19 @@ function baseCreateRenderer(options) {
 
     switch (type) {
       case Text:
-        processText(n1, n2, container)
+        processText(n1, n2, container, anchor)
         break
       case Comment:
-        processCommentNode(n1, n2, container)
+        processCommentNode(n1, n2, container, anchor)
         break
       case Fragment:
-        processFragment(n1, n2, container, parentComponent)
+        processFragment(n1, n2, container, parentComponent, anchor)
         break
       default:
         if (shapeFlag & ShapeFlags.COMPONENT) {
           processComponent(n1, n2, container, parentComponent)
         } else if (shapeFlag & ShapeFlags.ELEMENT) {
-          processElement(n1, n2, container, parentComponent)
+          processElement(n1, n2, container, parentComponent, anchor)
         }
     }
   }
@@ -371,16 +612,16 @@ function baseCreateRenderer(options) {
 
   function unmountChildren(
     children: VNode[],
-    parentComponent: ComponentInternalInstance
+    parentComponent: ComponentInternalInstance,
+    start = 0
   ) {
-    for (let i = 0; i < children.length; i++) {
+    for (let i = start; i < children.length; i++) {
       unmount(children[i], parentComponent)
     }
   }
 
   const unmount = (vnode, parentComponent) => {
     const { shapeFlag, type, children } = vnode
-    console.log('shapeFlag-----', type)
 
     if (shapeFlag & ShapeFlags.COMPONENT) {
       unmountComponent(vnode.component)
@@ -422,4 +663,45 @@ function baseCreateRenderer(options) {
     render,
     createApp: createAppAPI(render) as any,
   }
+}
+
+function getSequence(arr: number[]): number[] {
+  const p = arr.slice()
+  const result = [0]
+  let i, j, u, v, c
+  const len = arr.length
+  for (i = 0; i < len; i++) {
+    const arrI = arr[i]
+    if (arrI !== 0) {
+      j = result[result.length - 1]
+      if (arr[j] < arrI) {
+        p[i] = j
+        result.push(i)
+        continue
+      }
+      u = 0
+      v = result.length - 1
+      while (u < v) {
+        c = (u + v) >> 1
+        if (arr[result[c]] < arrI) {
+          u = c + 1
+        } else {
+          v = c
+        }
+      }
+      if (arrI < arr[result[u]]) {
+        if (u > 0) {
+          p[i] = result[u - 1]
+        }
+        result[u] = i
+      }
+    }
+  }
+  u = result.length
+  v = result[u - 1]
+  while (u-- > 0) {
+    result[u] = v
+    v = p[v]
+  }
+  return result
 }

@@ -6,6 +6,7 @@
 import { makeMap } from './makeMap'
 
 export const EMPTY_OBJ = {}
+export const EMPTY_ARR = []
 export const NOOP = (): void => {}
 
 export const isObject = (val: unknown): val is Record<any, any> => {
