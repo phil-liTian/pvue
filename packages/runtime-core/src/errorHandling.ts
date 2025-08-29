@@ -2,7 +2,7 @@
  * @Author: phil
  * @Date: 2025-08-15 11:54:23
  */
-import { isArray, isFunction } from '@pvue/shared'
+import { EMPTY_OBJ, isArray, isFunction } from '@pvue/shared'
 import { ComponentInternalInstance } from './component'
 import { LifecycleHooks } from './enums'
 import { warn } from './warning'
@@ -113,12 +113,25 @@ export function handleError(
   instance: ComponentInternalInstance | null | undefined,
   type: ErrorTypes
 ) {
-  logError(err, type)
+  // const { vnode } = instance
+  const contextVNode = instance ? instance.vnode : null
+  const { errorHandler, throwUnhandledErrorInProduction } =
+    (instance && instance.appContext.config) || (EMPTY_OBJ as any)
+
+  if (instance) {
+    if (errorHandler) {
+      callWithErrorHandling(errorHandler, null, ErrorCodes.APP_ERROR_HANDLER)
+    }
+  }
+
+  logError(err, type, throwUnhandledErrorInProduction)
 }
 
-function logError(err: unknown, type: ErrorTypes) {
+function logError(err: unknown, type: ErrorTypes, throwInProd = false) {
   const info = ErrorTypeStrings[type]
   if (__DEV__) {
     warn(`Unhandled error${info ? ` during execution of ${info}` : ``}`)
+  } else if (throwInProd) {
+    throw err
   }
 }

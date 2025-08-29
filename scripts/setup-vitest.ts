@@ -1,3 +1,7 @@
+/*
+ * @Author: phil
+ * @Date: 2025-08-06 14:25:43
+ */
 import { vitest, type MockInstance } from 'vitest'
 
 declare module 'vitest' {
@@ -29,6 +33,29 @@ expect.extend({
           (msgs.length
             ? `.\n\nActual messages:\n\n - ${msgs}`
             : ` but no warning was recorded.`),
+      }
+    }
+  },
+
+  toHaveBeenWarnedTimes(received: string, n: number) {
+    let found = 0
+    warn.mock.calls.forEach(args => {
+      if (args[0].includes(received)) {
+        found++
+      }
+    })
+
+    if (found === n) {
+      asserted.add(received)
+      return {
+        pass: true,
+        message: () => `expected "${received}" to have been warned ${n} times.`,
+      }
+    } else {
+      return {
+        pass: false,
+        message: () =>
+          `expected "${received}" to have been warned ${n} times but got ${found}.`,
       }
     }
   },

@@ -133,6 +133,7 @@ function setFullProps(
       }
     }
   }
+
   if (needCastKeys) {
     const rawCurrentProps = toRaw(props)
     const castValues = rawCastValues || EMPTY_OBJ
@@ -233,8 +234,15 @@ function resolvePropValue(
 ) {
   const opt = options[key]
   if (opt != null) {
-    const hasDefault = hasOwn(props, 'default')
-    if (hasDefault) {
+    const hasDefault = hasOwn(opt, 'default')
+    if (hasDefault && value === undefined) {
+      const defaultValue = opt.default
+
+      if (isFunction(defaultValue)) {
+      } else {
+        value = defaultValue
+      }
+
       // TODO
     } else {
       if (opt[BooleanFlags.shouldCast]) {

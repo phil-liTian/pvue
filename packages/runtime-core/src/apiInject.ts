@@ -53,7 +53,13 @@ export function inject(
   const instance = getCurrentInstance()
 
   if (instance || currentApp) {
-    const provides = instance?.parent?.provides
+    const provides = currentApp
+      ? currentApp._context.provides
+      : instance
+      ? instance.parent == null
+        ? instance.vnode.appContext && instance.vnode.appContext.provides
+        : instance.parent?.provides
+      : undefined
 
     if (provides && key in provides) {
       return provides[key]

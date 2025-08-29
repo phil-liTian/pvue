@@ -8,9 +8,11 @@ import {
   Data,
   FunctionalComponent,
 } from './component'
-import { cloneVNode, normalizeVNode, VNode } from './vnode'
+import { cloneVNode, normalizeVNode, VNode, Comment } from './vnode'
+
 import { setCurrentRenderingInstance } from './componentRenderContext'
 import { warn } from './warning'
+import { ErrorCodes, handleError } from './errorHandling'
 
 export function renderComponentRoot(
   instance: ComponentInternalInstance
@@ -29,7 +31,7 @@ export function renderComponentRoot(
   let result
   // 属性
   let fallthroughAttrs
-  setCurrentRenderingInstance(instance)
+  const prev = setCurrentRenderingInstance(instance)
   try {
     if (vnode.shapeFlag & ShapeFlags.STATEFUL_COMPONENT) {
       // 对象组件
@@ -56,7 +58,9 @@ export function renderComponentRoot(
 
       result = normalizeVNode(render(props, { attrs, slots, emit }))
     }
-  } finally {
+  } catch (err) {
+    handleError(err, instance, ErrorCodes.RENDER_FUNCTION)
+    result = normalizeVNode(Comment)
   }
 
   let root = result
@@ -66,6 +70,8 @@ export function renderComponentRoot(
       root = cloneVNode(root, fallthroughAttrs)
     }
   }
+
+  setCurrentRenderingInstance(prev)
   return root
 }
 
@@ -76,6 +82,10 @@ export function shouldUpdateComponent(prevVNode: VNode, nextVNode: VNode) {
     if (!nextChildren || !nextChildren.$stable) {
       return true
     }
+  }
+
+  if (prevProps === nextProps) {
+    return false
   }
 
   return hasPropsChanged(prevProps, nextProps)

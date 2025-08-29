@@ -555,7 +555,6 @@ function baseCreateRenderer(options) {
   // 移动元素
   const move = (vnode, container, anchor) => {
     const { el, type, children } = vnode
-    console.log('el', el)
 
     if (type === Fragment) {
       hostInsert(el, container, anchor)

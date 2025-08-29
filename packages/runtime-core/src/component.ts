@@ -15,7 +15,7 @@ import { EMPTY_OBJ, isFunction, isObject, ShapeFlags } from '@pvue/shared'
 import { currentRenderingInstance } from './componentRenderContext'
 import { LifecycleHooks } from './enums'
 import { SchedulerJob } from './scheduler'
-import { AppContext, createAppContext } from './apiCreateApp'
+import { AppConfig, AppContext, createAppContext } from './apiCreateApp'
 import {
   ComponentPropsOptions,
   initProps,
@@ -29,6 +29,7 @@ import {
   normalizeEmitsOptions,
   ObjectEmitsOptions,
 } from './componentEmits'
+import { warn } from './warning'
 
 export type LifecycleHook<TFn = Function> = (TFn | SchedulerJob)[] | null
 
@@ -208,8 +209,33 @@ export function setupComponent(instance: ComponentInternalInstance) {
   setupStatefulComponent(instance)
 }
 
+export function validateComponentName(
+  name: string,
+  { isNativeTag }: AppConfig
+) {
+  if (isNativeTag(name)) {
+    warn(
+      'Do not use built-in or reserved HTML elements as component id: ' + name
+    )
+  }
+}
+
 export function setupStatefulComponent(instance: ComponentInternalInstance) {
   const Component = instance.type
+
+  if (__DEV__) {
+    if (Component.name) {
+      validateComponentName(Component.name, instance.appContext.config)
+    }
+
+    if (Component.components) {
+      const names = Object.keys(Component.components)
+      for (let i = 0; i < names.length; i++) {
+        validateComponentName(names[i], instance.appContext.config)
+      }
+    }
+  }
+
   const { setup } = Component
 
   // 创建组件实例的代理对象，使用Proxy将instance.ctx包装，通过PublicInstanceProxyHandlers处理器拦截对组件实例的访问

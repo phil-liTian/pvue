@@ -9,10 +9,11 @@ import { RenderList } from './examples/renderList'
 import { ComponentEmits } from './examples/componentEmits'
 import { RendererElement } from './examples/rendererElement'
 import { RendererAttrsFallthrough } from './examples/rendererAttrsFallthrough'
+import { ApiCreateApp } from './examples/apiCreateApp'
 
 export const App = {
   render() {
-    return h(ApiInject)
+    return h(ApiCreateApp)
   },
 
   setup() {

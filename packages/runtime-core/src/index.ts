@@ -19,8 +19,13 @@ export { renderList } from './helpers/renderList'
 export { createSlots } from './helpers/createSlots'
 export { renderSlot } from './helpers/renderSlot'
 export { toHandlers } from './helpers/toHandlers'
+export { resolveComponent } from './helpers/resolveAssets'
 
-export { isClassComponent, type ClassComponent } from './component'
+export {
+  isClassComponent,
+  type ClassComponent,
+  type Component,
+} from './component'
 
 export { createRenderer, type RenderOptions } from './renderer'
 
@@ -34,6 +39,7 @@ export {} from './componentProps'
 export { callWithAsyncErrorHandling, ErrorCodes } from './errorHandling'
 
 export { provide, inject } from './apiInject'
+export { type Plugin } from './apiCreateApp'
 
 export {
   nextTick,

@@ -139,6 +139,9 @@ export function exposePropsOnRenderContext(
   }
 }
 
+export const isReservedPrefix = (key: string): key is '$' | '_' =>
+  key === '$' || key === '_'
+
 // 将setup上面的属性挂载到ctx上
 export function exposeSetupStateOnRenderContext(
   instance: ComponentInternalInstance
@@ -146,6 +149,16 @@ export function exposeSetupStateOnRenderContext(
   const { ctx, setupState } = instance
 
   Object.keys(toRaw(setupState)).forEach(key => {
+    if (isReservedPrefix(key[0])) {
+      warn(
+        `setup() return property ${JSON.stringify(
+          key
+        )} should not start with "$" or "_" ` +
+          `which are reserved prefixes for Vue internals.`
+      )
+      return
+    }
+
     Object.defineProperty(ctx, key, {
       enumerable: true,
       configurable: true,
