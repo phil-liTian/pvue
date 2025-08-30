@@ -21,7 +21,7 @@ export interface AppConfig {
   readonly isNativeTag: (tag: string) => boolean
   globalProperties: Record<string, any>
   optionMergeStrategies: Record<string, OptionMergeFunction>
-  throwUnhandledErrorInProduction: boolean
+  throwUnhandledErrorInProduction?: boolean
   errorHandler?: (
     err: unknown,
     instance: ComponentInternalInstance | null,
