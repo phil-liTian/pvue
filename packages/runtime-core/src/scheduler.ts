@@ -12,6 +12,7 @@ export enum SchedulerJobFlags {
   ALLOW_RECURSE = 1 << 2,
   DISPOSED = 1 << 3,
 }
+const resolvedPromise = Promise.resolve()
 
 const queue: SchedulerJob[] = []
 let currentFlushPromise: Promise<void> | null = null
@@ -44,11 +45,12 @@ export function nextTick<T = void, R = void>(
   // 打印当前函数的this上下文和传入的回调函数fn
 
   // 创建一个已解决状态的Promise对象，用于实现微任务队列的异步执行
-  const p = currentFlushPromise || Promise.resolve()
+  const p = currentFlushPromise || resolvedPromise
 
   // 根据是否传入回调函数fn来决定返回值：
   // 1. 如果传入了fn，则在Promise解决后执行该回调函数，并确保回调函数的this指向正确
   // 2. 如果没有传入fn，则直接返回Promise对象
+  // @ts-ignore
   return fn ? p.then(this ? fn.bind(this) : fn) : p
 }
 
@@ -142,7 +144,7 @@ function flushJobs() {
 //  更新nextTick中中的promise
 function queueFlush() {
   if (!currentFlushPromise) {
-    currentFlushPromise = Promise.resolve().then(flushJobs)
+    currentFlushPromise = resolvedPromise.then(flushJobs)
   }
 }
 

@@ -79,14 +79,15 @@ export class ReactiveEffect<T = any> implements Subscriber {
     if (!(this.flags & EffectFlags.ACTIVE)) {
       return this.fn()
     }
-
+    const prevEffect = activeSub
     // 这是需要收集的effect
     this.flags |= EffectFlags.RUNNING
     activeSub = this
     try {
-      this.fn()
+      return this.fn()
     } finally {
       cleanupDeps(this)
+      activeSub = prevEffect
       this.flags &= ~EffectFlags.RUNNING
     }
   }

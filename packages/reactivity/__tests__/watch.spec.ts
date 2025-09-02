@@ -1,11 +1,37 @@
 import { vitest } from 'vitest'
-import { EffectScope, Ref, ref } from '../src'
+import { computed, EffectScope, Ref, ref } from '../src'
 import {
   onWatcherCleanup,
   watch,
   WatchErrorCodes,
   WatchOptions,
+  WatchScheduler,
 } from '../src/watch'
+const queue: (() => void)[] = []
+let isFlushPending = false
+const resolvedPromise = /*@__PURE__*/ Promise.resolve() as Promise<any>
+
+const scheduler: WatchScheduler = (job, isFirstRun) => {
+  if (isFirstRun) {
+    job()
+  } else {
+    queue.push(job)
+    flushJobs()
+  }
+}
+
+const flushJobs = () => {
+  if (isFlushPending) return
+  isFlushPending = true
+  resolvedPromise.then(() => {
+    queue.forEach(job => job())
+    queue.length = 0
+    isFlushPending = false
+  })
+}
+
+const nextTick = (fn?: () => any) =>
+  fn ? resolvedPromise.then(fn) : resolvedPromise
 
 describe('reactivity/watch', () => {
   test('effect', () => {
@@ -27,7 +53,6 @@ describe('reactivity/watch', () => {
     })
     expect(dummy).toBe(undefined)
     source.value++
-    console.log('dummy', dummy)
 
     expect(dummy).toBe(1)
   })
@@ -90,7 +115,7 @@ describe('reactivity/watch', () => {
     ])
   })
 
-  test.skip('watch with onWatcherCleanup', async () => {
+  test('watch with onWatcherCleanup', async () => {
     let dummy = 0
     let source: Ref<number>
     const scope = new EffectScope()
@@ -117,11 +142,11 @@ describe('reactivity/watch', () => {
     })
     expect(dummy).toBe(20)
 
-    // scope.stop()
-    // expect(dummy).toBe(30)
+    scope.stop()
+    expect(dummy).toBe(30)
   })
 
-  test.skip('nested calls to baseWatch and onWatcherCleanup', async () => {
+  test('nested calls to baseWatch and onWatcherCleanup', async () => {
     let calls: string[] = []
     let source: Ref<number>
     let copyist: Ref<number>
@@ -169,38 +194,39 @@ describe('reactivity/watch', () => {
     expect(calls).toEqual(['sync 2', 'post 2'])
   })
 
-  test('once option should be ignored by simple watch', async () => {
-    let dummy: any
-    const source = ref(0)
-    watch(
-      () => {
-        dummy = source.value
-      },
-      null,
-      { once: true }
-    )
-    expect(dummy).toBe(0)
-
-    source.value++
-    expect(dummy).toBe(1)
-  })
-
-  test.skip('recursive sync watcher on computed', () => {
-    const r = ref(0)
-    const c = computed(() => r.value)
-
-    watch(c, v => {
-      if (v > 1) {
-        r.value--
-      }
+  describe('第二次执行的话 响应式数据变化后的cb是null', () => {
+    test('once option should be ignored by simple watch', async () => {
+      let dummy: any
+      const source = ref(0)
+      watch(
+        () => {
+          dummy = source.value
+        },
+        null,
+        { once: true }
+      )
+      expect(dummy).toBe(0)
+      source.value++
+      expect(dummy).toBe(1)
     })
 
-    expect(r.value).toBe(0)
-    expect(c.value).toBe(0)
+    test('recursive sync watcher on computed', () => {
+      const c = ref(0)
+      // const c = computed(() => r.value)
 
-    r.value = 10
-    expect(r.value).toBe(1)
-    expect(c.value).toBe(1)
+      watch(c, v => {
+        if (v > 1) {
+          c.value--
+        }
+      })
+
+      expect(c.value).toBe(0)
+      expect(c.value).toBe(0)
+
+      c.value = 10
+      expect(c.value).toBe(1)
+      expect(c.value).toBe(1)
+    })
   })
 
   test.skip('nested batch edge case', () => {

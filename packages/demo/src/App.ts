@@ -10,10 +10,11 @@ import { ComponentEmits } from './examples/componentEmits'
 import { RendererElement } from './examples/rendererElement'
 import { RendererAttrsFallthrough } from './examples/rendererAttrsFallthrough'
 import { ApiCreateApp } from './examples/apiCreateApp'
+import { ApiWatch } from './examples/apiWatch'
 
 export const App = {
   render() {
-    return h(ApiCreateApp)
+    return h(ApiWatch)
   },
 
   setup() {

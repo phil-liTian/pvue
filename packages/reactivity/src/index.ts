@@ -52,4 +52,11 @@ export { warn } from './warning'
 
 export { computed } from './computed'
 
-export { watch, onWatcherCleanup, type WatchOptions } from './watch'
+export {
+  watch,
+  onWatcherCleanup,
+  type WatchOptions,
+  type WatchEffect,
+  type WatchSource,
+  type WatchCallback,
+} from './watch'

@@ -9,6 +9,7 @@ import { refreshComputed } from './effect'
 
 export class ComputedRefImpl<T = any> {
   readonly dep: Dep = new Dep()
+  readonly __v_isRef = true
   _value: any = undefined
   constructor(public fn) {
     this._value = fn()
