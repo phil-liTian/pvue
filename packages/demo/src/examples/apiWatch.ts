@@ -6,6 +6,18 @@ export const ApiWatch = {
     const count = ref(0)
     const obj = reactive({ a: '123', b: { c: 'c' } })
 
+    const state = reactive({
+      nested: {
+        count: ref(0),
+      },
+      array: [1, 2, 3],
+      map: new Map([
+        ['a', 1],
+        ['b', 2],
+      ]),
+      set: new Set([1, 2, 3]),
+    })
+
     // @ts-ignore
     window.count = count
     // @ts-ignore
@@ -30,6 +42,19 @@ export const ApiWatch = {
       },
       { immediate: true }
     )
+
+    watch(
+      () => state,
+      (newVal, oldVal) => {
+        console.log('nested.count变化了', newVal, oldVal)
+      },
+      {
+        deep: true,
+      }
+    )
+
+    // @ts-ignore
+    window.state = state
 
     // warn
     watch(1, (newVal, oldVal) => {

@@ -36,7 +36,12 @@ export { setCurrentRenderingInstance, withCtx } from './componentRenderContext'
 
 export {} from './componentProps'
 
-export { watch } from './apiWatch'
+export {
+  watch,
+  watchPostEffect,
+  watchEffect,
+  watchSyncEffect,
+} from './apiWatch'
 
 export { callWithAsyncErrorHandling, ErrorCodes } from './errorHandling'
 

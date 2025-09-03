@@ -26,6 +26,7 @@ import {
 } from './componentRenderUtils'
 import { ReactiveEffect } from '@pvue/reactivity'
 import {
+  flushPostFlushCbs,
   queueJob,
   queuePostFlushCb,
   SchedulerJob,
@@ -646,6 +647,7 @@ function baseCreateRenderer(options) {
     performRemove()
   }
 
+  let isFlushing = false
   const render = (vnode, container) => {
     if (vnode == null) {
       unmount(container._vnode, null)
@@ -655,6 +657,12 @@ function baseCreateRenderer(options) {
 
     // 多次执行render函数 如果vnode不同 则 需要移除之前的vnode
     container._vnode = vnode
+
+    if (!isFlushing) {
+      isFlushing = true
+      flushPostFlushCbs()
+      isFlushing = false
+    }
   }
 
   // let hydrate: null = null

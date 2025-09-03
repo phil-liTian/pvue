@@ -140,6 +140,12 @@ export function watch(
     __DEV__ && warnInvalidSource(source)
   }
 
+  if (cb && deep) {
+    const baseGetter = getter
+    const depth = deep === true ? Infinity : deep
+    getter = () => traverse(baseGetter(), depth)
+  }
+
   const watchHandle: WatchHandle = () => {
     effect.stop()
   }
@@ -166,13 +172,17 @@ export function watch(
     if (cb) {
       const newValue = effect.run()
 
-      if (hasChanged(newValue, oldValue) || forceTrigger) {
+      if (deep || hasChanged(newValue, oldValue) || forceTrigger) {
         activeWatcher = effect
         if (cleanup) {
           cleanup()
         }
         try {
-          const args = [newValue, oldValue, boundCleanup]
+          const args = [
+            newValue,
+            oldValue === INITIAL_WATCHER_VALUE ? undefined : oldValue,
+            boundCleanup,
+          ]
           oldValue = newValue
           // @ts-ignore
           call ? call(cb, WatchErrorCodes.WATCH_CALLBACK, args) : cb(...args)
@@ -196,7 +206,7 @@ export function watch(
       } else {
         for (const cleanup of cleanups) cleanup()
       }
-      // 这里需要注意的是cleanup执行完成 需要从cleanMap中移除掉，下次响应式数据发生变化的时候，会重新手机依赖
+      // 这里需要注意的是cleanup执行完成 需要从cleanMap中移除掉，下次响应式数据发生变化的时候，会重新收集依赖
       cleanupMap.delete(effect)
     }
   }
@@ -266,9 +276,12 @@ export function traverse(
   }
   seen.add(value)
   depth--
+  if (isRef(value)) {
+    traverse(value.value, depth, seen)
+  }
 
   // 深度track数组中的元素，收集数组中元素的依赖
-  if (isArray(value)) {
+  else if (isArray(value)) {
     for (let i = 0; i < value.length; i++) {
       traverse(value[i], depth, seen)
     }

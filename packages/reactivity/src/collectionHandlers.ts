@@ -39,6 +39,11 @@ function createInstrumentations(readonly: boolean, shallow: boolean) {
 
       return res
     },
+
+    has(this, key): boolean {
+      const target = this[ReactiveFlags.RAW]
+      return target.has(key)
+    },
   }
 
   extend(
