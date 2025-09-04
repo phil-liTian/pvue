@@ -59,6 +59,25 @@ expect.extend({
       }
     }
   },
+
+  toHaveBeenWarnedLast(received: string) {
+    const passed =
+      warn.mock.calls[warn.mock.calls.length - 1][0].includes(received)
+    if (passed) {
+      asserted.add(received)
+      return {
+        pass: true,
+        message: () => `expected "${received}" not to have been warned last.`,
+      }
+    } else {
+      const msgs = warn.mock.calls.map(args => args[0]).join('\n - ')
+      return {
+        pass: false,
+        message: () =>
+          `expected "${received}" to have been warned last.\n\nActual messages:\n\n - ${msgs}`,
+      }
+    }
+  },
 })
 
 let warn: MockInstance

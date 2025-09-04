@@ -7,9 +7,13 @@ import {
   startBatch,
   type Subscriber,
 } from './effect'
+import { ComputedRefImpl } from './computed'
 
 type KeyToDepMap = Map<any, any>
 const targetMap: WeakMap<object, KeyToDepMap> = new WeakMap()
+
+// 每次响应式数据发生变化时 都会自增1
+export let globalVersion = 0
 
 export const ARRAY_ITERATE_KEY: unique symbol = Symbol('Array iterate')
 export const ITERATE_KEY: unique symbol = Symbol('Object iterate')
@@ -36,6 +40,14 @@ export class Dep {
   version = 0
   activeLink: Link | undefined = undefined
   subs?: Link = undefined
+  constructor(public computed?: ComputedRefImpl | undefined) {}
+
+  /**
+   * 跟踪依赖关系
+   * 将当前活动的订阅者与此依赖项关联
+   * 如果已存在链接则更新其版本
+   * 如果链接已失效则重新定位到链表尾部
+   */
   track() {
     if (!activeSub) {
       return
@@ -43,20 +55,46 @@ export class Dep {
 
     // let link = new Link(activeSub, this)
     let link = this.activeLink
-    if (!link) {
+    // 当前dep没有activeLink,则创建一个
+    if (link == undefined) {
       link = this.activeLink = new Link(activeSub, this)
-    }
-    // this.subs.push(activeSub)
 
-    if (!activeSub.deps) {
-      // 初始化链表
-      activeSub.deps = activeSub.depsTail = link
-    }
+      if (!activeSub.deps) {
+        // 初始化链表
+        activeSub.deps = activeSub.depsTail = link
+      } else {
+        // 有的话则在队尾加入link
+        link.prevDep = activeSub.depsTail
+        // 在队尾加入link
+        activeSub.depsTail.nextDep = link
+        // 队尾指向link
+        activeSub.depsTail = link
+      }
+      addSub(link)
+    } else if (link.version === -1) {
+      link.version = this.version
+      if (link.nextDep) {
+        // const next = link.nextDep
+        // next.prevDep = link.prevDep
 
-    addSub(link)
+        // link的prev指向队尾，next指向undefined
+        link.prevDep = activeSub.depsTail
+        link.nextDep = undefined
+
+        // 队尾的next指向link
+        activeSub.depsTail.nextDep = link
+        // 队尾指向link
+        activeSub.depsTail = link
+
+        if (activeSub.deps === link) {
+          // activeSub.deps = next
+        }
+      }
+    }
   }
 
   trigger() {
+    globalVersion++
     this.notify()
   }
 
@@ -65,7 +103,10 @@ export class Dep {
     startBatch()
     try {
       for (let link = this.subs; link; link = link.prevSub) {
+        // 通知收集的依赖要更新了
         if (link.sub.notify()) {
+          // computed 依赖的属性发生了变化
+          ;(link.sub as ComputedRefImpl).dep.notify()
         }
       }
     } finally {
@@ -81,6 +122,12 @@ export class Dep {
 function addSub(link: Link) {
   // link的sub就是effect
   if (link.sub.flags & EffectFlags.TRACKING) {
+    // 如果effect监听的是一个computed值, 需要将该computed标记成TRACKING, 促使computed依赖的的属性发生变化时, 可以重新执行effect
+    const computed = link.dep.computed
+    if (computed) {
+      computed.flags |= EffectFlags.TRACKING
+    }
+
     const currentTail = link.dep.subs
     // console.log('currentTail', currentTail)
     if (currentTail !== link) {

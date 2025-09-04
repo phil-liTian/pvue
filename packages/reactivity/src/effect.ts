@@ -1,11 +1,12 @@
 import { extend } from '@pvue/shared'
-import { Dep, Link } from './dep'
+import { Dep, Link, globalVersion } from './dep'
 import { activeEffectScope } from './effectScope'
 import { ComputedRefImpl } from './computed'
 
 export type EffectScheduler = (...args: any[]) => any
 export let activeSub
 let batchedSub: Subscriber | undefined
+let batchedComputed: Subscriber | undefined
 let batchDepth = 0
 export interface Subscriber {
   deps?: Link
@@ -26,8 +27,14 @@ export enum EffectFlags {
   EVALUATED = 1 << 7,
 }
 
-function batch(sub) {
+export function batch(sub: Subscriber, isComputed: boolean = false) {
   sub.flags |= EffectFlags.NOTIFIED
+
+  if (isComputed) {
+    sub.next = batchedComputed
+    batchedComputed = sub
+    return
+  }
   // batchedSub为将最新的sub添加到链表的最前面的结果
   sub.next = batchedSub
   batchedSub = sub
@@ -39,6 +46,18 @@ export function startBatch() {
 
 export function endBatch() {
   if (--batchDepth > 0) return
+
+  if (batchedComputed) {
+    let e: Subscriber | undefined = batchedComputed
+    batchedComputed = undefined
+
+    while (e) {
+      let next = e.next
+      e.next = undefined
+      e.flags &= ~EffectFlags.NOTIFIED
+      e = next
+    }
+  }
 
   while (batchedSub) {
     let e: Subscriber | undefined = batchedSub
@@ -141,9 +160,32 @@ export interface ReactiveEffectRunner<T = any> {
   effect: ReactiveEffect
 }
 
+/**
+ * 准备订阅者的依赖项，将所有依赖项的版本标记为-1
+ * @param sub 订阅者对象
+ */
+function prepareDeps(sub: Subscriber) {
+  for (let link = sub.deps; link; link = link.nextDep) {
+    link.version = -1
+  }
+}
+
 export function refreshComputed(computed: ComputedRefImpl) {
-  const value = computed.fn()
-  computed._value = value
+  if (computed.globalVersion === globalVersion) return
+  computed.flags &= ~EffectFlags.DIRTY
+
+  computed.globalVersion = globalVersion
+  const prevSub = activeSub
+  activeSub = computed
+
+  try {
+    prepareDeps(computed as any)
+
+    const value = computed.fn(computed._value)
+    computed._value = value
+  } finally {
+    activeSub = prevSub
+  }
 }
 
 export function effect<T = any>(fn: () => T, options?: ReactiveEffectOptions) {
