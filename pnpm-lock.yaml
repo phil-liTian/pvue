@@ -51,6 +51,9 @@ importers:
 
   packages/reactivity:
     devDependencies:
+      '@pvue/runtime-test':
+        specifier: workspace:*
+        version: link:../runtime-test
       '@pvue/shared':
         specifier: workspace:*
         version: link:../shared

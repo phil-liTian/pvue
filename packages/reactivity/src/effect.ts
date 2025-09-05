@@ -1,4 +1,4 @@
-import { extend } from '@pvue/shared'
+import { extend, hasChanged } from '@pvue/shared'
 import { Dep, Link, globalVersion } from './dep'
 import { activeEffectScope } from './effectScope'
 import { ComputedRefImpl } from './computed'
@@ -25,6 +25,21 @@ export enum EffectFlags {
   ALLOW_RECURSE = 1 << 5,
   PAUSED = 1 << 6,
   EVALUATED = 1 << 7,
+}
+
+function isDirty(sub: Subscriber): boolean {
+  for (let link = sub.deps; link; link = link.nextDep) {
+    if (
+      link.dep.version !== link.version ||
+      (link.dep.computed &&
+        (refreshComputed(link.dep.computed) ||
+          link.dep.version !== link.version))
+    ) {
+      return true
+    }
+  }
+
+  return false
 }
 
 export function batch(sub: Subscriber, isComputed: boolean = false) {
@@ -98,15 +113,20 @@ export class ReactiveEffect<T = any> implements Subscriber {
     if (!(this.flags & EffectFlags.ACTIVE)) {
       return this.fn()
     }
+    // TODO
+    prepareDeps(this)
     const prevEffect = activeSub
     // 这是需要收集的effect
     this.flags |= EffectFlags.RUNNING
+    const prevShouldTrack = shouldTrack
     activeSub = this
+    shouldTrack = true
     try {
       return this.fn()
     } finally {
       cleanupDeps(this)
       activeSub = prevEffect
+      shouldTrack = prevShouldTrack
       this.flags &= ~EffectFlags.RUNNING
     }
   }
@@ -115,7 +135,9 @@ export class ReactiveEffect<T = any> implements Subscriber {
    * @internal
    */
   runIfDirty() {
-    this.run()
+    if (isDirty(this)) {
+      this.run()
+    }
   }
 
   stop() {
@@ -145,7 +167,7 @@ export class ReactiveEffect<T = any> implements Subscriber {
     if (this.scheduler) {
       this.scheduler()
     } else {
-      this.run()
+      this.runIfDirty()
     }
   }
 }
@@ -167,24 +189,34 @@ export interface ReactiveEffectRunner<T = any> {
 function prepareDeps(sub: Subscriber) {
   for (let link = sub.deps; link; link = link.nextDep) {
     link.version = -1
+    link.prevActiveLink = link.dep.activeLink
+    link.dep.activeLink = link
   }
 }
 
-export function refreshComputed(computed: ComputedRefImpl) {
+export function refreshComputed(computed: ComputedRefImpl): undefined {
   if (computed.globalVersion === globalVersion) return
   computed.flags &= ~EffectFlags.DIRTY
 
   computed.globalVersion = globalVersion
   const prevSub = activeSub
   activeSub = computed
+  const dep = computed.dep
+  const prevShouldTrack = shouldTrack
+  shouldTrack = true
 
   try {
     prepareDeps(computed as any)
 
     const value = computed.fn(computed._value)
-    computed._value = value
+    if (dep.version === 0 || hasChanged(value, computed._value)) {
+      dep.version++
+      computed._value = value
+    }
   } finally {
     activeSub = prevSub
+    cleanupDeps(computed)
+    shouldTrack = prevShouldTrack
   }
 }
 
@@ -209,13 +241,27 @@ export function stop(runner: ReactiveEffectRunner) {
 
 function cleanupDeps(sub: Subscriber) {
   let link = sub.depsTail
+  let head
 
   while (link) {
+    
     const prev = link.prevDep
-
+    head = link
     link.dep.activeLink = link.prevActiveLink
     link.prevActiveLink = undefined
 
     link = prev
   }
+
 }
+
+
+export let shouldTrack = true
+
+export function pauseTracking(): void {
+  shouldTrack = false
+}
+
+export function enableTracking(): void {}
+
+export function resetTracking(): void {}

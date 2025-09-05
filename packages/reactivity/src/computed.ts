@@ -74,8 +74,13 @@ export class ComputedRefImpl<T = any> {
   }
 
   get value() {
-    this.dep.track()
+    const link = this.dep.track()
     refreshComputed(this)
+    // 更新link的version 与 dep的version一致
+    if (link) {
+      link.version = this.dep.version
+    }
+
     return this._value
   }
 
@@ -106,7 +111,7 @@ export function computed<T>(
 
 // computed.deps 是‘被谁依赖’的集合 而不是‘依赖了谁的集合’。 computed 创建时，仅初始化了 “追踪自身依赖（响应式变量）” 的能力，并未挂载 deps（因为还没有其他副作用依赖它）
 
-// computed是一个订阅对象，初次track时，会挂载一个deps, 后续如果computed依赖多个属性，这些属性都会被添加到nextDep中，如果依赖的属性发生变化, 这个computed的version会被重置成-1，然后在track的时候，会将这些-1的computed的nextDep进行更新，发生变化后依赖的属性可能会增加，往nextDep中添加新增的属性
+// computed是一个订阅对象，初次track时，会挂载一个deps, 后续如果computed依赖多个属性，这些属性都会被添加到nextDep中，如果依赖的属性发生变化, 这个computed的version会被重置成-1，然后在track的时候，会将这些-1的computed的nextDep进行更新，发生变化后依赖的属性可能会增加，往nextDeps添加新增的属性
 
 // 如果effect里面监听的是一个computed, 那么computed的依赖属性发生变化了, 如何让这个effect重新执行？？？
 // 1. 依赖收集阶段：如果activeSub是computed, 则将当前sub的flag置为TRACKING, 使computed的依赖属性get时可以被正常收集到 link.dep.subs = link

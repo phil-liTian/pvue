@@ -4,6 +4,7 @@ import {
   activeSub,
   EffectFlags,
   endBatch,
+  shouldTrack,
   startBatch,
   type Subscriber,
 } from './effect'
@@ -49,7 +50,7 @@ export class Dep {
    * 如果链接已失效则重新定位到链表尾部
    */
   track() {
-    if (!activeSub) {
+    if (!activeSub || !shouldTrack) {
       return
     }
 
@@ -74,8 +75,8 @@ export class Dep {
     } else if (link.version === -1) {
       link.version = this.version
       if (link.nextDep) {
-        // const next = link.nextDep
-        // next.prevDep = link.prevDep
+        const next = link.nextDep
+        next.prevDep = link.prevDep
 
         // link的prev指向队尾，next指向undefined
         link.prevDep = activeSub.depsTail
@@ -87,13 +88,16 @@ export class Dep {
         activeSub.depsTail = link
 
         if (activeSub.deps === link) {
-          // activeSub.deps = next
+          activeSub.deps = next
         }
       }
     }
+
+    return link
   }
 
   trigger() {
+    this.version++
     globalVersion++
     this.notify()
   }
