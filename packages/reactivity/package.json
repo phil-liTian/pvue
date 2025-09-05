@@ -10,6 +10,7 @@
   "license": "ISC",
   "description": "",
   "devDependencies": {
-    "@pvue/shared": "workspace:*"
+    "@pvue/shared": "workspace:*",
+    "@pvue/runtime-test": "workspace:*"
   }
 }
