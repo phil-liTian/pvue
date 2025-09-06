@@ -11,7 +11,7 @@ import {
 import { ComputedRefImpl } from './computed'
 
 type KeyToDepMap = Map<any, any>
-const targetMap: WeakMap<object, KeyToDepMap> = new WeakMap()
+export const targetMap: WeakMap<object, KeyToDepMap> = new WeakMap()
 
 // 每次响应式数据发生变化时 都会自增1
 export let globalVersion = 0
@@ -41,6 +41,8 @@ export class Dep {
   version = 0
   activeLink: Link | undefined = undefined
   subs?: Link = undefined
+  map?: KeyToDepMap = undefined
+  key?: unknown = undefined
   constructor(public computed?: ComputedRefImpl | undefined) {}
 
   /**
@@ -153,6 +155,10 @@ export function track(target: Object, type: TrackOpTypes, key: unknown) {
 
   if (!dep) {
     depsMap.set(key, (dep = new Dep()))
+
+    // 当执行stop的时候 depsMap中的内容都应该被清空掉
+    dep.map = depsMap
+    dep.key = key
   }
 
   dep.track()
@@ -195,7 +201,8 @@ export function trigger(
     }
   }
 
-  if (key != void 0) {
+  // undefined 做对象的key时 也要执行trigger
+  if (key != void 0 || depsMap.get(void 0)) {
     // target如果是array, 这里的dep是undefined, 不会执行
     run(dep)
   }

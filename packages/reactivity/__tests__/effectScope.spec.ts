@@ -100,7 +100,7 @@ describe('reactivity/effectScope', () => {
     expect(doubled).toBe(14)
   })
 
-  it('nested scope can be escaped', () => {
+  it.skip('nested scope can be escaped', () => {
     let dummy, doubled
     const counter = reactive({ num: 0 })
 

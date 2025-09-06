@@ -5,15 +5,32 @@
 
 import { extend, hasOwn } from '@pvue/shared'
 import { ReactiveFlags, TrackOpTypes, TriggerOpTypes } from './constants'
-import { toRaw, toReactive } from './reactive'
+import { Target, toRaw, toReactive } from './reactive'
 import { track, trigger } from './dep'
 
 type CollectionTypes = IterableCollections | WeakCollections
 type IterableCollections = Map<any, any> | Set<any>
-type WeakCollections = WeakMap<any, any> | Set<any>
+type WeakCollections = WeakMap<any, any> | WeakSet<any>
+type SetTypes = (Set<any> | WeakSet<any>) & Target
+type MapTypes = (Map<any, any> | WeakMap<any, any>) & Target
 
 const getProto = <T extends CollectionTypes>(v: T): any =>
   Reflect.getPrototypeOf(v)
+
+function createIterableMethod(method) {
+  return function (this, ...args) {
+    const target = this[ReactiveFlags.RAW]
+    const rawTarget = toRaw(target)
+    const innerIterator = target[method](...args)
+
+    return {
+      next() {
+        const { value, done } = innerIterator.next()
+        return { value, done }
+      },
+    }
+  }
+}
 
 function createInstrumentations(readonly: boolean, shallow: boolean) {
   const instrumentations = {
@@ -21,7 +38,9 @@ function createInstrumentations(readonly: boolean, shallow: boolean) {
       const target = this[ReactiveFlags.RAW]
       const rawTarget = toRaw(target)
       const rawKey = toRaw(key)
-      // track(rawTarget, TrackOpTypes.GET, rawKey)
+      if (!readonly) {
+        track(rawTarget, TrackOpTypes.GET, rawKey)
+      }
 
       const { has } = getProto(rawTarget)
 
@@ -51,7 +70,7 @@ function createInstrumentations(readonly: boolean, shallow: boolean) {
     readonly
       ? {}
       : {
-          set(this, key: unknown, value: unknown) {
+          set(this: MapTypes, key: unknown, value: unknown) {
             // console.log('this', this, key, value)
             const target = toRaw(this)
             target.set(key, value)
@@ -59,8 +78,28 @@ function createInstrumentations(readonly: boolean, shallow: boolean) {
 
             return this
           },
+
+          add(this: SetTypes, value) {
+            const target = toRaw(this)
+
+            const proto = getProto(target)
+            const hadKey = proto.has.call(target, value)
+            if (!hadKey) {
+              target.add(value)
+            }
+
+            return this
+          },
         }
   )
+
+  // 处理for...of key是 Symbol.iterator
+
+  const iteratorMethods = [Symbol.iterator]
+
+  iteratorMethods.map(item => {
+    instrumentations[item] = createIterableMethod(item)
+  })
 
   return instrumentations
 }

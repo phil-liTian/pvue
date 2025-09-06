@@ -2,6 +2,8 @@
  * @Author: phil
  * @Date: 2025-08-01 20:07:37
  */
+import { targetMap } from '../src/dep'
+import { computed, effect, ref, shallowRef } from '../src/index'
 import {
   isProxy,
   isReactive,
@@ -167,7 +169,7 @@ describe('reactivity/reactive', () => {
     expect(original.bar).toBe(original2)
   })
 
-  test.skip('mutation on objects using reactive as prototype should not trigger', () => {
+  test('mutation on objects using reactive as prototype should not trigger', () => {
     const observed = reactive({ foo: 1 })
     const original = Object.create(observed)
     let dummy
@@ -383,7 +385,7 @@ describe('reactivity/reactive', () => {
     expect(isReadonly(map.get('bar'))).toBe(true)
   })
 
-  test.skip('The results of the shallow and readonly assignments are the same (Set)', () => {
+  test('The results of the shallow and readonly assignments are the same (Set)', () => {
     const set = reactive(new Set())
     set.add(shallowReactive({ a: 2 }))
     set.add(readonly({ b: 2 }))
@@ -396,7 +398,7 @@ describe('reactivity/reactive', () => {
   })
 
   // #11696
-  test.skip('should use correct receiver on set handler for refs', () => {
+  test('should use correct receiver on set handler for refs', () => {
     const a = reactive(ref(1))
     effect(() => a.value)
     expect(() => {
@@ -405,7 +407,7 @@ describe('reactivity/reactive', () => {
   })
 
   // #11979
-  test.skip('should release property Dep instance if it no longer has subscribers', () => {
+  test('should release property Dep instance if it no longer has subscribers', () => {
     let obj = { x: 1 }
     let a = reactive(obj)
     const e = effect(() => a.x)
@@ -414,17 +416,17 @@ describe('reactivity/reactive', () => {
     expect(targetMap.get(obj)?.get('x')).toBeFalsy()
   })
 
-  test.skip('should trigger reactivity when Map key is undefined', () => {
+  test('should trigger reactivity when Map key is undefined', () => {
     const map = reactive(new Map())
     const c = computed(() => map.get(void 0))
-
+    c.value
     expect(c.value).toBe(void 0)
 
     map.set(void 0, 1)
     expect(c.value).toBe(1)
   })
 
-  test.skip('should return true for reactive objects', () => {
+  test('should return true for reactive objects', () => {
     expect(isReactive(reactive({}))).toBe(true)
     expect(isReactive(readonly(reactive({})))).toBe(true)
     expect(isReactive(ref({}).value)).toBe(true)
@@ -432,7 +434,7 @@ describe('reactivity/reactive', () => {
     expect(isReactive(shallowReactive({}))).toBe(true)
   })
 
-  test.skip('should return false for non-reactive objects', () => {
+  test('should return false for non-reactive objects', () => {
     expect(isReactive(ref(true))).toBe(false)
     expect(isReactive(shallowRef({}).value)).toBe(false)
   })

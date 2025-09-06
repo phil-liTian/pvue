@@ -146,7 +146,12 @@ export class ReactiveEffect<T = any> implements Subscriber {
       // this.dep.clear()
       // this.deps?.dep = new Link({}, {})
 
-      for (let link = this.deps; link; link = link.nextDep) {}
+      for (let link = this.deps; link; link = link.nextDep) {
+        // link 的sub 就是subscriber dep就是依赖项
+        removeSub(link)
+      }
+
+      this.deps = undefined
 
       this.onStop && this.onStop()
       this.flags &= ~EffectFlags.ACTIVE
@@ -244,7 +249,6 @@ function cleanupDeps(sub: Subscriber) {
   let head
 
   while (link) {
-    
     const prev = link.prevDep
     head = link
     link.dep.activeLink = link.prevActiveLink
@@ -252,9 +256,16 @@ function cleanupDeps(sub: Subscriber) {
 
     link = prev
   }
-
 }
 
+function removeSub(link: Link) {
+  const { dep } = link
+
+  // 当执行stop的时候 应该要清空targetMap中的内容
+  if (dep.map && dep.key) {
+    dep.map.delete(dep.key)
+  }
+}
 
 export let shouldTrack = true
 
