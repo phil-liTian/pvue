@@ -3,8 +3,6 @@
  * @Date: 2025-09-02 10:53:27
 -->
 
-## 已实现功能
-
 ### 响应式原理
 
 基于 Proxy 代理和 Effect 副作用系统实现：通过 Proxy 对数据对象进行包装，拦截其属性的读取（get）和修改（set）操作；当读取属性时，触发依赖收集，将当前执行的副作用函数（如组件渲染、watch 回调等）通过 Link 结构关联到对应属性的依赖集合（dep）中；当属性被修改时，触发依赖触发，遍历该属性的 dep 集合并执行所有关联的副作用函数，从而实现数据变化自动驱动视图或相关逻辑更新，同时通过 WeakMap 等数据结构高效管理依赖关系，确保响应式系统的性能和内存安全性
@@ -150,5 +148,3 @@ export class Link {
 7. Reflect 是处理不了 Map 和 Set 的 for...of 的, 那么是如何处理的呢？
 
 - for...of 的遍历 key 会是一个 Symbol.iterator 类型, 那么 Map 和 Set 就可以使用 Symbol.iterator 进行遍历, 通过调用 innerIterator.next()方法, 来实现遍历的逻辑, 当调用 next 方法时, 会返回一个对象, 包含 value 和 done 两个属性, value 是当前遍历到的元素, done 是一个 boolean 类型, 表示是否遍历完成
-
-### 运行时核心
