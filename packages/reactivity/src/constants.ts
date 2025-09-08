@@ -17,4 +17,5 @@ export enum TriggerOpTypes {
   SET = 'set',
   DELETE = 'delete',
   ADD = 'add',
+  CLEAR = 'clear',
 }

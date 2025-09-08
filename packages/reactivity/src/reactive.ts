@@ -39,6 +39,11 @@ enum TargetType {
   COLLECTION = 2,
 }
 
+/**
+ * 根据对象的类型确定其响应式类型
+ * @param rawType 对象的类型
+ * @returns 对象的响应式类型
+ */
 function targetTypeMap(rawType: string) {
   switch (rawType) {
     case 'Object':
@@ -54,6 +59,11 @@ function targetTypeMap(rawType: string) {
   }
 }
 
+/**
+ * 确定目标对象的响应式类型
+ * @param value 要检查的目标对象
+ * @returns 目标对象的响应式类型
+ */
 function getTargetType(value: Target) {
   return value[ReactiveFlags.SKIP] || !Object.isExtensible(value)
     ? TargetType.INVALID
@@ -62,6 +72,11 @@ function getTargetType(value: Target) {
 
 export function reactive<T extends Object>(target: T): Reactive<T>
 
+/**
+ * 创建一个响应式对象
+ * @param target 目标对象
+ * @returns 响应式代理对象
+ */
 export function reactive(target: Object) {
   return createReactiveObject(
     target,
@@ -72,6 +87,11 @@ export function reactive(target: Object) {
   )
 }
 
+/**
+ * 创建一个浅层响应式对象，只有对象的第一层属性是响应式的
+ * @param target 目标对象
+ * @returns 浅层响应式代理对象
+ */
 export function shallowReactive(target: Object) {
   return createReactiveObject(
     target,
@@ -82,7 +102,11 @@ export function shallowReactive(target: Object) {
   )
 }
 
-// 只读
+/**
+ * 创建一个只读的响应式对象
+ * @param target 目标对象
+ * @returns 只读的响应式代理对象
+ */
 export function readonly(target: Object) {
   return createReactiveObject(
     target,
@@ -93,7 +117,11 @@ export function readonly(target: Object) {
   )
 }
 
-// 只读 且 浅层监听
+/**
+ * 创建一个浅层只读的响应式对象
+ * @param target 目标对象
+ * @returns 浅层只读的响应式代理对象
+ */
 export function shallowReadonly(target: Object) {
   return createReactiveObject(
     target,
@@ -104,18 +132,38 @@ export function shallowReadonly(target: Object) {
   )
 }
 
+/**
+ * 将值转换为响应式对象
+ * @param value 要转换的值
+ * @returns 如果值是对象则返回响应式对象，否则返回原值
+ */
 export function toReactive<T extends unknown>(value: T) {
   return isObject(value) ? reactive(value) : value
 }
 
+/**
+ * 检查一个值是否为响应式对象
+ * @param value - 要检查的值
+ * @returns 如果值是响应式对象则返回true，否则返回false
+ */
 export function isReactive(value: unknown): boolean {
   return !!(value && (value as Target)[ReactiveFlags.IS_REACTIVE])
 }
 
+/**
+ * 检查一个值是否为浅响应式对象
+ * @param value - 要检查的值
+ * @returns 如果值是浅响应式对象则返回true，否则返回false
+ */
 export function isShallow(value: unknown): boolean {
   return !!(value && (value as Target)[ReactiveFlags.IS_SHALLOW])
 }
 
+/**
+ * 检查一个值是否为只读响应式对象
+ * @param value - 要检查的值
+ * @returns 如果值是只读响应式对象则返回true，否则返回false
+ */
 export function isReadonly(value: unknown): boolean {
   return !!(value && (value as Target)[ReactiveFlags.IS_READONLY])
 }
@@ -158,12 +206,21 @@ function createReactiveObject(
   return proxy
 }
 
+/**
+ * 将响应式对象转换为原始对象
+ * @param observed 响应式对象
+ * @returns 原始对象
+ */
 export function toRaw<T>(observed: T): T {
   const raw = observed && ((observed as Target)[ReactiveFlags.RAW] as T)
   return raw ? toRaw(raw) : observed
 }
 
-// 标记一个对象，使其永远不会被转换为响应式对象 。
+/**
+ * 将对象标记为"原始"，使其不会被转换为响应式对象
+ * @param value 要标记的对象
+ * @returns 原始对象
+ */
 export function markRaw<T extends Object>(value: T): Raw<T> {
   if (Object.isExtensible(value) && !hasOwn(value, ReactiveFlags.SKIP)) {
     // 可拓展
@@ -173,6 +230,15 @@ export function markRaw<T extends Object>(value: T): Raw<T> {
   return value
 }
 
+/**
+ * 检查一个值是否为代理对象
+ * @param value - 要检查的值
+ * @returns 如果值是代理对象则返回true，否则返回false
+ */
 export function isProxy(value: any): boolean {
   return value ? !!value[ReactiveFlags.RAW] : false
+}
+
+export function toReadonly(value) {
+  isObject(value) ? readonly(value) : value
 }

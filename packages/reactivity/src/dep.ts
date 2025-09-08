@@ -1,4 +1,4 @@
-import { isArray, isIntegerKey, isSymbol } from '@pvue/shared'
+import { isArray, isIntegerKey, isMap, isSymbol } from '@pvue/shared'
 import { TrackOpTypes, TriggerOpTypes } from './constants'
 import {
   activeSub,
@@ -17,7 +17,10 @@ export const targetMap: WeakMap<object, KeyToDepMap> = new WeakMap()
 export let globalVersion = 0
 
 export const ARRAY_ITERATE_KEY: unique symbol = Symbol('Array iterate')
+// map的size、forEach方法调用的时候 记录这个key, 在增、删、改时 通过这个key触发effect方法
 export const ITERATE_KEY: unique symbol = Symbol('Object iterate')
+// 调用map的keys方法 记录这个key;在map增加或者删除的时候 通过这个key触发effect方法
+export const MAP_KEY_ITERATE_KEY: unique symbol = Symbol('Map key iterate')
 
 export class Link {
   version: number
@@ -184,48 +187,68 @@ export function trigger(
   }
 
   startBatch()
-  const targetIsArray = isArray(target)
-  const isArrayIndex = targetIsArray && isIntegerKey(key)
 
-  // 如果直接修改 array的length属性, 则直接触发 depsMap中收集的key对应的dep
-  if (targetIsArray && key === 'length') {
-    const newLength = Number(newValue)
-    depsMap.forEach((dep, key) => {
-      if (key === 'length' || (!isSymbol(key) && key >= newLength)) {
-        run(dep)
-      }
-    })
+  if (type === TriggerOpTypes.CLEAR) {
+    // 清空map
+    depsMap.forEach(run)
   } else {
-    if (isArrayIndex) {
-      run(depsMap.get(ARRAY_ITERATE_KEY))
-    }
-  }
+    const targetIsArray = isArray(target)
+    const isArrayIndex = targetIsArray && isIntegerKey(key)
 
-  // undefined 做对象的key时 也要执行trigger
-  if (key != void 0 || depsMap.get(void 0)) {
-    // target如果是array, 这里的dep是undefined, 不会执行
-    run(dep)
-  }
-
-  switch (type) {
-    case TriggerOpTypes.ADD: {
-      if (!targetIsArray) {
-        run(depsMap.get(ITERATE_KEY))
-      } else if (isArrayIndex) {
-        run(depsMap.get('length'))
+    // 如果直接修改 array的length属性, 则直接触发 depsMap中收集的key对应的dep
+    if (targetIsArray && key === 'length') {
+      const newLength = Number(newValue)
+      depsMap.forEach((dep, key) => {
+        if (key === 'length' || (!isSymbol(key) && key >= newLength)) {
+          run(dep)
+        }
+      })
+    } else {
+      if (isArrayIndex) {
+        run(depsMap.get(ARRAY_ITERATE_KEY))
       }
-      break
     }
 
-    case TriggerOpTypes.DELETE: {
-      // if (!targetIsArray) {
-      //   run(depsMap.get(ITERATE_KEY))
-      // }
+    // undefined 做对象的key时 也要执行trigger
+    if (key != void 0 || depsMap.get(void 0)) {
+      // target如果是array, 这里的dep是undefined, 不会执行
+      run(dep)
     }
-    default: {
+
+    switch (type) {
+      case TriggerOpTypes.ADD: {
+        if (!targetIsArray) {
+          run(depsMap.get(ITERATE_KEY))
+          if (isMap(target)) {
+            run(depsMap.get(MAP_KEY_ITERATE_KEY))
+          }
+        } else if (isArrayIndex) {
+          run(depsMap.get('length'))
+        }
+        break
+      }
+
+      case TriggerOpTypes.SET: {
+        if (!targetIsArray) {
+          run(depsMap.get(ITERATE_KEY))
+        }
+        break
+      }
+
+      case TriggerOpTypes.DELETE: {
+        if (!targetIsArray) {
+          run(depsMap.get(ITERATE_KEY))
+
+          if (isMap(target)) {
+            run(depsMap.get(MAP_KEY_ITERATE_KEY))
+          }
+        }
+      }
+
+      default: {
+      }
     }
   }
-
   // 处理array
   endBatch()
 }

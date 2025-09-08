@@ -3,10 +3,18 @@
  * @Date: 2025-08-01 20:46:48
  */
 
-import { extend, hasOwn } from '@pvue/shared'
+import { extend, hasChanged, hasOwn, toRawType } from '@pvue/shared'
 import { ReactiveFlags, TrackOpTypes, TriggerOpTypes } from './constants'
-import { Target, toRaw, toReactive } from './reactive'
-import { track, trigger } from './dep'
+import {
+  isReadonly,
+  isShallow,
+  Target,
+  toRaw,
+  toReactive,
+  toReadonly,
+} from './reactive'
+import { ITERATE_KEY, MAP_KEY_ITERATE_KEY, track, trigger } from './dep'
+import { warn } from './warning'
 
 type CollectionTypes = IterableCollections | WeakCollections
 type IterableCollections = Map<any, any> | Set<any>
@@ -14,19 +22,34 @@ type WeakCollections = WeakMap<any, any> | WeakSet<any>
 type SetTypes = (Set<any> | WeakSet<any>) & Target
 type MapTypes = (Map<any, any> | WeakMap<any, any>) & Target
 
+const toShallow = <T extends unknown>(value: T): T => value
+
 const getProto = <T extends CollectionTypes>(v: T): any =>
   Reflect.getPrototypeOf(v)
 
-function createIterableMethod(method) {
+function createIterableMethod(method, isReadonly: boolean, isShallow: boolean) {
   return function (this, ...args) {
     const target = this[ReactiveFlags.RAW]
     const rawTarget = toRaw(target)
     const innerIterator = target[method](...args)
 
+    const isKeyOnly = method === 'keys'
+
+    track(
+      rawTarget,
+      TrackOpTypes.ITERATE,
+      isKeyOnly ? MAP_KEY_ITERATE_KEY : ITERATE_KEY
+    )
+
+    const wrap = isReadonly ? toReadonly : isShallow ? toShallow : toReactive
+
     return {
       next() {
         const { value, done } = innerIterator.next()
-        return { value, done }
+        return { value: wrap(value), done }
+      },
+      [Symbol.iterator]() {
+        return this
       },
     }
   }
@@ -39,6 +62,11 @@ function createInstrumentations(readonly: boolean, shallow: boolean) {
       const rawTarget = toRaw(target)
       const rawKey = toRaw(key)
       if (!readonly) {
+        // 如果说rawKey和key有变化，也需要收集key的变化;也就是说如果map的key是一个响应式对象, 那么进行依赖收集的时候，需要同时收集key和rawKey两个依赖
+        if (hasChanged(rawKey, key)) {
+          track(rawTarget, TrackOpTypes.GET, key)
+        }
+
         track(rawTarget, TrackOpTypes.GET, rawKey)
       }
 
@@ -61,20 +89,62 @@ function createInstrumentations(readonly: boolean, shallow: boolean) {
 
     has(this, key): boolean {
       const target = this[ReactiveFlags.RAW]
+      track(target, TrackOpTypes.HAS, key)
       return target.has(key)
+    },
+
+    get size() {
+      const target = this[ReactiveFlags.RAW]
+      // 收集size的依赖, get size的key与set的key不同 如何处理？？
+      track(target, TrackOpTypes.ITERATE, ITERATE_KEY)
+
+      return Reflect.get(target, 'size')
+    },
+
+    forEach(this: IterableCollections, callback: Function, thisArgs) {
+      const observed = this
+      const target = observed[ReactiveFlags.RAW]
+      const rawTarget = toRaw(target)
+      const wrap = shallow ? toShallow : readonly ? toReadonly : toReactive
+
+      track(target, TrackOpTypes.ITERATE, ITERATE_KEY)
+      return target.forEach((value, key) => {
+        return callback.call(thisArgs, wrap(value), wrap(key))
+      })
     },
   }
 
   extend(
     instrumentations,
     readonly
-      ? {}
+      ? {
+          // 只读的话, 不可增、删、改、清空
+        }
       : {
           set(this: MapTypes, key: unknown, value: unknown) {
+            // 处理value 如果value是响应式对象, 那么需要转换成原始对象
+            if (!shallow && !isShallow(value) && !isReadonly(value)) {
+              value = toRaw(value)
+            }
+
             // console.log('this', this, key, value)
             const target = toRaw(this)
+            const { has, get } = getProto(target)
+            let hadKey = has.call(target, key)
+
+            if (!hadKey) {
+            } else if (__DEV__) {
+              checkIdentityKeys(target, has, key)
+            }
+
+            const oldValue = get.call(target, key)
             target.set(key, value)
-            trigger(target, TriggerOpTypes.SET, key, value)
+
+            if (!hadKey) {
+              trigger(target, TriggerOpTypes.ADD, key, value)
+            } else if (hasChanged(oldValue, value)) {
+              trigger(target, TriggerOpTypes.SET, key, value)
+            }
 
             return this
           },
@@ -90,15 +160,39 @@ function createInstrumentations(readonly: boolean, shallow: boolean) {
 
             return this
           },
+
+          delete(this: SetTypes, key) {
+            const target = toRaw(this)
+            const proto = getProto(target)
+
+            const hadKey = proto.has.call(target, key)
+            const result = target.delete(key)
+            if (hadKey) {
+              trigger(target, TriggerOpTypes.DELETE, key)
+            }
+
+            return result
+          },
+
+          clear(this: IterableCollections) {
+            const target = toRaw(this)
+            const hadItems = target.size !== 0
+            const result = target.clear()
+            if (hadItems) {
+              trigger(target, TriggerOpTypes.CLEAR)
+            }
+
+            return result
+          },
         }
   )
 
   // 处理for...of key是 Symbol.iterator
 
-  const iteratorMethods = [Symbol.iterator]
+  const iteratorMethods = [Symbol.iterator, 'keys', 'values', 'entries']
 
   iteratorMethods.map(item => {
-    instrumentations[item] = createIterableMethod(item)
+    instrumentations[item] = createIterableMethod(item, readonly, shallow)
   })
 
   return instrumentations
@@ -144,3 +238,25 @@ export const readonlyCollectionHandlers: ProxyHandler<any> = {
 export const shallowReadonlyCollectionHandlers: ProxyHandler<any> = {
   get: createInstrumentationGetter(true, true),
 }
+
+function checkIdentityKeys(target: CollectionTypes, has, key: unknown) {
+  const rawKey = toRaw(key)
+  if (rawKey !== key && has.call(target, rawKey)) {
+    const type = toRawType(target)
+    warn(
+      `Reactive ${type} contains both the raw and reactive ` +
+        `versions of the same object${type === `Map` ? ` as keys` : ``}, ` +
+        `which can lead to inconsistencies. ` +
+        `Avoid differentiating between the raw and reactive versions ` +
+        `of an object and only use the reactive version if possible.`
+    )
+  }
+}
+
+// track size,或者forEach时, 当add, delete, clear都会改变size的大小，那么如果在这些方法执行时触发size更新呢, 增加ITERATE_KEY的类型依赖，增删改都触发ITERATE_KEY更新
+
+// vue的处理响应式数据Map类型时 为什么要将keys、entries、values单独处理？
+// Map的 keys, values, entries 方法都返回的是迭代器对象, 需要调用next方法才能获取到值.而迭代器是惰性的、一次性的，并且其本身不具备响应式能力。
+//  是惰性的：值只在调用 next() 时才计算
+//  是一次性的：遍历完就“耗尽”了，无法重新开始
+//  不是响应式的：map 的变化不会自动通知到已创建的 iterator。
