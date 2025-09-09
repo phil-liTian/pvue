@@ -240,5 +240,5 @@ export function isProxy(value: any): boolean {
 }
 
 export function toReadonly(value) {
-  isObject(value) ? readonly(value) : value
+  return isObject(value) ? readonly(value) : value
 }

@@ -3,7 +3,14 @@
  * @Date: 2025-08-01 20:46:48
  */
 
-import { extend, hasChanged, hasOwn, toRawType } from '@pvue/shared'
+import {
+  capitalize,
+  extend,
+  hasChanged,
+  hasOwn,
+  isMap,
+  toRawType,
+} from '@pvue/shared'
 import { ReactiveFlags, TrackOpTypes, TriggerOpTypes } from './constants'
 import {
   isReadonly,
@@ -27,13 +34,33 @@ const toShallow = <T extends unknown>(value: T): T => value
 const getProto = <T extends CollectionTypes>(v: T): any =>
   Reflect.getPrototypeOf(v)
 
+function createReadonlyMethod(type: TriggerOpTypes): Function {
+  return function (this, ...args: unknown[]) {
+    if (__DEV__) {
+      console.log('args', args)
+      const key = args[0] ? `on key "${args[0]}" ` : ''
+
+      warn(
+        `${capitalize(type)} operation ${key}failed: target is readonly.`,
+        toRaw(this)
+      )
+
+      // const key
+    }
+  }
+}
+
 function createIterableMethod(method, isReadonly: boolean, isShallow: boolean) {
   return function (this, ...args) {
     const target = this[ReactiveFlags.RAW]
     const rawTarget = toRaw(target)
+    //
+    const targetIsMap = isMap(rawTarget)
+
     const innerIterator = target[method](...args)
 
-    const isKeyOnly = method === 'keys'
+    // 是Map的keys方法
+    const isKeyOnly = method === 'keys' && targetIsMap
 
     track(
       rawTarget,
@@ -41,7 +68,8 @@ function createIterableMethod(method, isReadonly: boolean, isShallow: boolean) {
       isKeyOnly ? MAP_KEY_ITERATE_KEY : ITERATE_KEY
     )
 
-    const wrap = isReadonly ? toReadonly : isShallow ? toShallow : toReactive
+    // const wrap = isReadonly ? toReadonly : isShallow ? toShallow : toReactive
+    const wrap = isShallow ? toShallow : isReadonly ? toReadonly : toReactive
 
     return {
       next() {
@@ -72,7 +100,7 @@ function createInstrumentations(readonly: boolean, shallow: boolean) {
 
       const { has } = getProto(rawTarget)
 
-      const wrap = toReactive
+      const wrap = shallow ? toShallow : readonly ? toReadonly : toReactive
       // set、map、weakSet、weakMap的value会自动转换成响应式对象
       if (has.call(rawTarget, key)) {
         return wrap(target.get(key))
@@ -89,8 +117,17 @@ function createInstrumentations(readonly: boolean, shallow: boolean) {
 
     has(this, key): boolean {
       const target = this[ReactiveFlags.RAW]
-      track(target, TrackOpTypes.HAS, key)
-      return target.has(key)
+
+      const rawKey = toRaw(key)
+
+      if (hasChanged(key, rawKey)) {
+        track(target, TrackOpTypes.HAS, key)
+      }
+      track(target, TrackOpTypes.HAS, rawKey)
+
+      return rawKey === key
+        ? target.has(rawKey)
+        : target.has(key) || target.has(rawKey)
     },
 
     get size() {
@@ -109,7 +146,7 @@ function createInstrumentations(readonly: boolean, shallow: boolean) {
 
       track(target, TrackOpTypes.ITERATE, ITERATE_KEY)
       return target.forEach((value, key) => {
-        return callback.call(thisArgs, wrap(value), wrap(key))
+        return callback.call(thisArgs, wrap(value), wrap(key), this)
       })
     },
   }
@@ -119,6 +156,10 @@ function createInstrumentations(readonly: boolean, shallow: boolean) {
     readonly
       ? {
           // 只读的话, 不可增、删、改、清空
+          set: createReadonlyMethod(TriggerOpTypes.SET),
+          delete: createReadonlyMethod(TriggerOpTypes.DELETE),
+          clear: createReadonlyMethod(TriggerOpTypes.CLEAR),
+          add: createReadonlyMethod(TriggerOpTypes.ADD),
         }
       : {
           set(this: MapTypes, key: unknown, value: unknown) {
@@ -150,12 +191,17 @@ function createInstrumentations(readonly: boolean, shallow: boolean) {
           },
 
           add(this: SetTypes, value) {
+            if (!shallow && !isShallow(value) && !isReadonly(value)) {
+              value = toRaw(value)
+            }
+
             const target = toRaw(this)
 
             const proto = getProto(target)
             const hadKey = proto.has.call(target, value)
             if (!hadKey) {
               target.add(value)
+              trigger(target, TriggerOpTypes.ADD, value)
             }
 
             return this
@@ -163,9 +209,17 @@ function createInstrumentations(readonly: boolean, shallow: boolean) {
 
           delete(this: SetTypes, key) {
             const target = toRaw(this)
-            const proto = getProto(target)
+            const { has } = getProto(target)
 
-            const hadKey = proto.has.call(target, key)
+            let hadKey = has.call(target, key)
+
+            if (!hadKey) {
+              key = toRaw(key)
+              hadKey = has.call(target, key)
+            } else if (__DEV__) {
+              checkIdentityKeys(target, has, key)
+            }
+
             const result = target.delete(key)
             if (hadKey) {
               trigger(target, TriggerOpTypes.DELETE, key)
@@ -205,6 +259,8 @@ function createInstrumentationGetter(isReadonly: boolean, shallow: boolean) {
       return target
     } else if (key === ReactiveFlags.IS_REACTIVE) {
       return !isReadonly
+    } else if (key === ReactiveFlags.IS_READONLY) {
+      return isReadonly
     }
 
     // console.log('hasown', target, key, hasOwn(instrumentations, key))
