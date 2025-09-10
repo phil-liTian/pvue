@@ -179,7 +179,7 @@ describe('reactivity/effect', () => {
     list.push('World!')
     expect(dummy).toBe('Hello World!')
     list.shift()
-    expect(dummy).toBe('World! ')
+    expect(dummy).toBe('World!')
   })
 
   it('should observe implicit array length changes', () => {
@@ -204,7 +204,7 @@ describe('reactivity/effect', () => {
     list[0] = 'Hello'
     expect(dummy).toBe('Hello World!')
     list.pop()
-    expect(dummy).toBe('Hello ')
+    expect(dummy).toBe('Hello')
   })
 
   it('should observe enumeration', () => {

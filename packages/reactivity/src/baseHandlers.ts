@@ -120,7 +120,11 @@ class BaseReactiveHandler implements ProxyHandler<Target> {
   }
 
   ownKeys(target: Record<string | symbol, unknown>): (string | symbol)[] {
-    track(target, TrackOpTypes.ITERATE, ITERATE_KEY)
+    track(
+      target,
+      TrackOpTypes.ITERATE,
+      isArray(target) ? 'length' : ITERATE_KEY
+    )
 
     return Reflect.ownKeys(target)
   }
@@ -174,6 +178,8 @@ class MutableReactiveHandler extends BaseReactiveHandler {
 }
 
 function hasOwnProperty(this: object, key: unknown) {
+  // should track hasOwnProperty call with index, hasOwnProperty的值可能是数值类型，delete时 key默认时string类型
+  if (!isSymbol(key)) key = String(key)
   const obj = toRaw(this)
   track(obj, TrackOpTypes.HAS, key)
   return obj.hasOwnProperty(key as string)

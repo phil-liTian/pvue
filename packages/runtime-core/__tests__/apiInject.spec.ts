@@ -228,7 +228,6 @@ describe('api: provide/inject', () => {
     // console.log('count.value', count.value)
 
     await nextTick()
-    console.log('root', root)
 
     // expect(serialize(root)).toBe(`<div>2</div>`)
   })

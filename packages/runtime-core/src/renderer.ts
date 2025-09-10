@@ -207,7 +207,6 @@ function baseCreateRenderer(options) {
       instance.next = n2
       instance.update()
     } else {
-      console.log('asda')
     }
   }
 
