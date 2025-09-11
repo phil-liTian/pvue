@@ -1,7 +1,9 @@
-import { isArray, isIntegerKey, isMap, isSymbol } from '@pvue/shared'
+import { extend, isArray, isIntegerKey, isMap, isSymbol } from '@pvue/shared'
 import { TrackOpTypes, TriggerOpTypes } from './constants'
 import {
   activeSub,
+  DebuggerEventExtraInfo,
+  effect,
   EffectFlags,
   endBatch,
   shouldTrack,
@@ -44,9 +46,16 @@ export class Dep {
   version = 0
   activeLink: Link | undefined = undefined
   subs?: Link = undefined
+
+  // 测试环境使用
+  subsHead?: Link
   map?: KeyToDepMap = undefined
   key?: unknown = undefined
-  constructor(public computed?: ComputedRefImpl | undefined) {}
+  constructor(public computed?: ComputedRefImpl | undefined) {
+    if (__DEV__) {
+      this.subsHead = undefined
+    }
+  }
 
   /**
    * 跟踪依赖关系
@@ -54,15 +63,16 @@ export class Dep {
    * 如果已存在链接则更新其版本
    * 如果链接已失效则重新定位到链表尾部
    */
-  track() {
+  track(debugInfo?: DebuggerEventExtraInfo) {
     if (!activeSub || !shouldTrack) {
       return
     }
 
     // let link = new Link(activeSub, this)
     let link = this.activeLink
-    // 当前dep没有activeLink,则创建一个
-    if (link == undefined) {
+    // 当前dep没有activeLink 或者effect不同 ,则创建一个
+    // #debug: the call sequence of onTrigger
+    if (link == undefined || activeSub !== link.sub) {
       link = this.activeLink = new Link(activeSub, this)
 
       if (!activeSub.deps) {
@@ -72,7 +82,7 @@ export class Dep {
         // 有的话则在队尾加入link
         link.prevDep = activeSub.depsTail
         // 在队尾加入link
-        activeSub.depsTail.nextDep = link
+        activeSub.depsTail!.nextDep = link
         // 队尾指向link
         activeSub.depsTail = link
       }
@@ -88,7 +98,7 @@ export class Dep {
         link.nextDep = undefined
 
         // 队尾的next指向link
-        activeSub.depsTail.nextDep = link
+        activeSub.depsTail!.nextDep = link
         // 队尾指向link
         activeSub.depsTail = link
 
@@ -98,19 +108,36 @@ export class Dep {
       }
     }
 
+    if (__DEV__ && activeSub.onTrack) {
+      activeSub.onTrack(
+        extend(
+          {
+            effect: activeSub,
+          },
+          debugInfo
+        )
+      )
+    }
+
     return link
   }
 
-  trigger() {
+  trigger(debugInfo?: DebuggerEventExtraInfo) {
     this.version++
     globalVersion++
-    this.notify()
+    this.notify(debugInfo)
   }
 
-  notify() {
+  notify(debugInfo?: DebuggerEventExtraInfo) {
     // this.subs.forEach(effect => effect.run())
     startBatch()
     try {
+      for (let head = this.subsHead; head; head = head.nextSub) {
+        if (head.sub.onTrigger && !(head.sub.flags & EffectFlags.NOTIFIED)) {
+          head.sub.onTrigger(extend({ effect: head.sub }, debugInfo))
+        }
+      }
+
       for (let link = this.subs; link; link = link.prevSub) {
         // 通知收集的依赖要更新了
         if (link.sub.notify()) {
@@ -144,6 +171,10 @@ function addSub(link: Link) {
       if (currentTail) currentTail.nextSub = link
     }
 
+    if (__DEV__ && link.dep.subsHead == undefined) {
+      link.dep.subsHead = link
+    }
+
     link.dep.subs = link
   }
 }
@@ -164,7 +195,15 @@ export function track(target: Object, type: TrackOpTypes, key: unknown) {
     dep.key = key
   }
 
-  dep.track()
+  if (__DEV__) {
+    dep.track({
+      target,
+      type,
+      key,
+    })
+  } else {
+    dep.track()
+  }
 }
 
 export function trigger(
@@ -182,7 +221,17 @@ export function trigger(
 
   const run = (dep: Dep | undefined) => {
     if (dep) {
-      dep.trigger()
+      if (__DEV__) {
+        dep.trigger({
+          target,
+          key,
+          type,
+          oldValue,
+          newValue,
+        })
+      } else {
+        dep.trigger()
+      }
     }
   }
 
@@ -251,4 +300,13 @@ export function trigger(
   }
   // 处理array
   endBatch()
+}
+
+export function getDepFromReactive(
+  object: any,
+  key: string | number | symbol
+): Dep | undefined {
+  const depMap = targetMap.get(object)
+
+  return depMap?.get(key)
 }

@@ -100,10 +100,11 @@ class BaseReactiveHandler implements ProxyHandler<Target> {
 
   deleteProperty(target: Target, key: string | symbol): boolean {
     const hadKey = hasOwn(target, key)
+    const oldValue = target[key]
     const result = Reflect.deleteProperty(target, key)
     if (result && hadKey) {
       // 删除操作触发更新
-      trigger(target, TriggerOpTypes.DELETE, key)
+      trigger(target, TriggerOpTypes.DELETE, key, undefined, oldValue)
     }
     return result
   }

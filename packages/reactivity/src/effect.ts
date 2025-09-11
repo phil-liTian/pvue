@@ -2,18 +2,24 @@ import { extend, hasChanged } from '@pvue/shared'
 import { Dep, Link, globalVersion } from './dep'
 import { activeEffectScope } from './effectScope'
 import { ComputedRefImpl } from './computed'
+import { TrackOpTypes, TriggerOpTypes } from './constants'
+import { warn } from './warning'
 
 export type EffectScheduler = (...args: any[]) => any
-export let activeSub
+export let activeSub: Subscriber | undefined
 let batchedSub: Subscriber | undefined
 let batchedComputed: Subscriber | undefined
 let batchDepth = 0
+
+const pausedQueueEffects = new WeakSet<ReactiveEffect>()
 export interface Subscriber {
   deps?: Link
   depsTail?: Link
   flags: EffectFlags
   next?: Subscriber
   notify(): true | void
+  onTrack?: (event: DebuggerEvent) => void
+  onTrigger?: (event: DebuggerEvent) => void
 }
 
 export enum EffectFlags {
@@ -25,6 +31,19 @@ export enum EffectFlags {
   ALLOW_RECURSE = 1 << 5,
   PAUSED = 1 << 6,
   EVALUATED = 1 << 7,
+}
+
+export type DebuggerEvent = {
+  effect: Subscriber
+} & DebuggerEventExtraInfo
+
+export type DebuggerEventExtraInfo = {
+  target: object
+  type: TrackOpTypes | TriggerOpTypes
+  key: any
+  newValue?: any
+  oldValue?: any
+  oldTarget?: Map<any, any> | Set<any>
 }
 
 function isDirty(sub: Subscriber): boolean {
@@ -102,9 +121,29 @@ export class ReactiveEffect<T = any> implements Subscriber {
 
   onStop?: () => void
 
+  onTrack?: (event: DebuggerEvent) => void
+
+  // 内置 清空函数
+  cleanup?: () => void = undefined
+
   constructor(public fn: () => T) {
     if (activeEffectScope && activeEffectScope.active) {
       activeEffectScope.effects.push(this)
+    }
+  }
+
+  pause() {
+    this.flags |= EffectFlags.PAUSED
+  }
+
+  resume() {
+    if (this.flags & EffectFlags.PAUSED) {
+      // 重置为正常状态
+      this.flags &= ~EffectFlags.PAUSED
+      if (pausedQueueEffects.has(this)) {
+        pausedQueueEffects.delete(this)
+        this.trigger()
+      }
     }
   }
 
@@ -114,6 +153,8 @@ export class ReactiveEffect<T = any> implements Subscriber {
       return this.fn()
     }
     // TODO
+
+    cleanupEffect(this)
     prepareDeps(this)
     const prevEffect = activeSub
     // 这是需要收集的effect
@@ -153,6 +194,7 @@ export class ReactiveEffect<T = any> implements Subscriber {
 
       this.deps = undefined
 
+      cleanupEffect(this)
       this.onStop && this.onStop()
       this.flags &= ~EffectFlags.ACTIVE
     }
@@ -169,7 +211,10 @@ export class ReactiveEffect<T = any> implements Subscriber {
   }
 
   trigger() {
-    if (this.scheduler) {
+    if (this.flags & EffectFlags.PAUSED) {
+      pausedQueueEffects.add(this)
+      // 停止的effect需要收集起来 在resume之后会再拿出来执行
+    } else if (this.scheduler) {
       this.scheduler()
     } else {
       this.runIfDirty()
@@ -177,7 +222,12 @@ export class ReactiveEffect<T = any> implements Subscriber {
   }
 }
 
-export interface ReactiveEffectOptions {
+export interface DebuggerOptions {
+  onTrack?: (event: DebuggerEvent) => void
+  onTrigger?: (event: DebuggerEvent) => void
+}
+
+export interface ReactiveEffectOptions extends DebuggerOptions {
   onStop?: () => void
   scheduler?: EffectScheduler
 }
@@ -226,6 +276,12 @@ export function refreshComputed(computed: ComputedRefImpl): undefined {
 }
 
 export function effect<T = any>(fn: () => T, options?: ReactiveEffectOptions) {
+  // 如果effect的fn本来就是一个effect函数 则 将effect的fn与之前的fn保持一致
+  // should not double wrap if the passed function is a effect
+  if ((fn as ReactiveEffectRunner).effect instanceof ReactiveEffect) {
+    fn = (fn as ReactiveEffectRunner).effect.fn
+  }
+
   const e = new ReactiveEffect(fn)
 
   if (options) {
@@ -249,6 +305,11 @@ function cleanupDeps(sub: Subscriber) {
   let head
 
   while (link) {
+    // fn函数执行完成后 都要清空targetMap中的数据
+    if (link.version === -1) {
+      removeSub(link)
+    }
+
     const prev = link.prevDep
     head = link
     link.dep.activeLink = link.prevActiveLink
@@ -259,7 +320,17 @@ function cleanupDeps(sub: Subscriber) {
 }
 
 function removeSub(link: Link) {
-  const { dep } = link
+  const { dep, prevSub, nextSub } = link
+
+  // # should only remove the dep when the last effect is stopped
+  if (nextSub) {
+    nextSub.prevSub = prevSub
+  }
+
+  // 是同一个Subscriber
+  if (dep.subs === link) {
+    dep.subs = prevSub
+  }
 
   // 当执行stop的时候 应该要清空targetMap中的内容
   if (dep.map && dep.key) {
@@ -276,3 +347,43 @@ export function pauseTracking(): void {
 export function enableTracking(): void {}
 
 export function resetTracking(): void {}
+
+export function onEffectCleanup(
+  fn: () => void,
+  failSilently: boolean = false
+): void {
+  if (activeSub instanceof ReactiveEffect) {
+    activeSub.cleanup = fn
+  } else if (__DEV__ && !failSilently) {
+    warn(
+      `onEffectCleanup() was called when there was no active effect` +
+        ` to associate with.`
+    )
+  }
+}
+
+function cleanupEffect(e: ReactiveEffect) {
+  const { cleanup } = e
+  e.cleanup = undefined
+  if (cleanup) {
+    try {
+      cleanup()
+    } finally {
+    }
+  }
+}
+
+// startBatch和endBatch的设计初衷：批量合并更新； 合并多次连续的数据修改触发的更新
+// startBatch：标记 "进入批量更新模式"，此时响应式数据的修改不会立即触发副作用执行，而是将副作用函数暂存到队列中。
+// endBatch：标记 "退出批量更新模式"，此时会统一执行队列中暂存的副作用函数（并通过NOTIFIED去重），确保只执行一次最终结果。
+
+// pauseTracking和resetTracking的设计初衷: 用于控制依赖追踪开关的核心函数，主要解决 "不必要的依赖收集" 问题，优化响应式系统的性能。
+// pauseTracking()：暂停依赖追踪，此时读取响应式数据不会收集任何依赖。
+// resetTracking()：恢复依赖追踪，让系统重新开始收集依赖。
+// 例如处理array的shift、push、pop、unshift方法时, 使用pauseTracking避免不必要的收集; 模板中静态部分的渲染（如固定文本）不需要追踪依赖，Vue 会在处理静态内容时暂停追踪。
+// 避免无关操作触发不必要的依赖关联，减少冗余更新。
+// 确保只有真正需要响应数据变化的副作用被正确追踪。
+
+// effect的pause、resume是要解决什么问题？
+
+// onEffectCleanup是要解决什么问题？

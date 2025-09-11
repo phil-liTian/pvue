@@ -18,7 +18,7 @@ export {
   type Reactive,
 } from './reactive'
 
-export { effect, ReactiveEffect } from './effect'
+export { effect, onEffectCleanup, ReactiveEffect } from './effect'
 
 export {
   effectScope,
@@ -44,7 +44,7 @@ export {
   type MaybeRefOrGetter,
 } from './ref'
 
-export { trigger } from './dep'
+export { trigger, getDepFromReactive, track } from './dep'
 
 export { ReactiveFlags, TriggerOpTypes } from './constants'
 

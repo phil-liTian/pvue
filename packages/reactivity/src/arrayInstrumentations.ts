@@ -1,6 +1,6 @@
 import { TrackOpTypes } from './constants'
 import { ARRAY_ITERATE_KEY, track } from './dep'
-import { startBatch, endBatch } from './effect'
+import { startBatch, endBatch, pauseTracking } from './effect'
 import { isProxy, isShallow, toRaw, toReactive } from './reactive'
 
 function searchProxy(
@@ -75,6 +75,7 @@ function noTracking(
   method: keyof Array<any>,
   args: unknown[] = []
 ) {
+  pauseTracking()
   startBatch()
   const res = (toRaw(self) as any)[method].apply(self, args)
   endBatch()
