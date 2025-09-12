@@ -149,3 +149,112 @@ export class Link {
 7. Reflect 是处理不了 Map 和 Set 的 for...of 的, 那么是如何处理的呢？
 
 - for...of 的遍历 key 会是一个 Symbol.iterator 类型, 那么 Map 和 Set 就可以使用 Symbol.iterator 进行遍历, 通过调用 innerIterator.next()方法, 来实现遍历的逻辑, 当调用 next 方法时, 会返回一个对象, 包含 value 和 done 两个属性, value 是当前遍历到的元素, done 是一个 boolean 类型, 表示是否遍历完成
+
+8. dep 需要是\_\_v_skip 对象, 不能在获取对象的 dep 的也当作响应式对象被收集起来了, 需要被当作一种 INVALID 类型, 防止被处理成响应式对象。
+
+9. startBatch 和 endBatch 被设计出来是要解决什么问题？
+
+- startBatch 标记 "进入批量更新模式"，此时响应式数据的修改不会立即触发副作用执行，而是将副作用函数暂存到队列中。
+- endBatch 标记 "退出批量更新模式"，此时会统一执行队列中暂存的副作用函数（并通过 NOTIFIED 去重），确保只执行一次最终结果。
+  是为了解决批量更新的问题，当响应式对象发生时，并不能立即去执行 effect 的回调函数，而是先 notify 依赖需要被收集，将需要收集的对象放到 batchedSub 中，在所有的 notify 都执行完毕后，batchSub 会收集所有的 effect，使用 next 连接，最后使用 batchEnd 依次执行 batchedSub 中的 subscrier。
+
+10. pauseTracking 和 resetTracking 起到什么作用
+
+- 用于控制依赖追踪开关的核心函数，主要解决 "不必要的依赖收集" 问题，优化响应式系统的性能。
+  pauseTracking()：暂停依赖追踪，此时读取响应式数据不会收集任何依赖。
+  resetTracking()：恢复依赖追踪，让系统重新开始收集依赖。
+  例如处理 array 的 shift、push、pop、unshift 方法时, 使用 pauseTracking 避免不必要的收集; 模板中静态部分的渲染（如固定文本）不需要追踪依赖，Vue 会在处理静态内容时暂停追踪。
+  避免无关操作触发不必要的依赖关联，减少冗余更新。
+  确保只有真正需要响应数据变化的副作用被正确追踪。
+
+11. effect 的 pause 和 reasume 是干什么用的？
+    pause 将当前 effect 的 flags 置成 PAUSED; 在 trigger 的时候，收集的 effectfn 不会立即执行，而是将其收集到 pausedQueueEffects 对象里面。这些 fn 在 resume 的时候会逐一执行
+
+12. onEffectCleanup
+    在 effect 执行完毕之后，执行的清空操作
+
+13. onTrack 和 onTrigger 为什么会被需要？
+    在 track 的时候收集关键信息，确保执行过程是预期结果。在 Trigger 的时候 检查 value 和 oldvalue 等相关信息是否正确。DebuggerEventExtraInfo 是触发的关键信息
+
+### 运行时核心
+
+从初始化时通过 createApp 建立应用上下文，到组件挂载阶段将 setup 函数返回值与响应式系统（Proxy 拦截器）绑定实现依赖收集，再到数据变更触发 trigger 时通过 effect 调度器推送更新任务至微任务队列，最终在 patch 过程中结合编译期标记的 PatchFlags 与双端 Diff 算法精准更新 VNode，并通过 queueJob 的优先级管理机制（如 flushPreFlushCbs 与 flushPostFlushCbs）协调生命周期钩子与副作用函数的执行时机，形成 "数据响应 - 任务调度 - 节点更新" 的闭环，同时通过 renderer 接口的抽象设计实现跨平台渲染能力的解耦。
+
+核心 api
+
+- createVNode 创建一个虚拟节点
+  可处理参数(type, props， children), type 可以是 string 类型或者是对象类型, 如果 type 是一个 string 类型则认为是 element，如果是一个对象则认为是 COMPONENT，chilren 可分为三类，TEXT_CHILDREN,ARRAY_CHILDREN, SLOTS_CHILDREN（当 type 是一个对象，children 也是一个对象时，这个 children 就认为是 SLOTS_CHILDREN）. 会返回一个 VNode 对象
+
+```js
+export enum ShapeFlags {
+  ELEMENT = 1,
+  FUNCTIONAL_COMPONENT = 1 << 1,
+  STATEFUL_COMPONENT = 1 << 2,
+  TEXT_CHILDREN = 1 << 3,
+  ARRAY_CHILDREN = 1 << 4,
+  SLOTS_CHILDREN = 1 << 5,
+  TELEPORT = 1 << 6,
+  SUSPENSE = 1 << 7,
+  COMPONENT_SHOULD_KEEP_ALIVE = 1 << 8,
+  COMPONENT_KEPT_ALIVE = 1 << 9,
+  COMPONENT = ShapeFlags.STATEFUL_COMPONENT | ShapeFlags.FUNCTIONAL_COMPONENT,
+}
+```
+
+- isVNode
+  判断对象身上是否有\_\_v_isVNode 属性，内部实现类似响应式系统判断是否是 reactive 或者 ref 是一样的.
+
+- createTextVNode
+  快速创建一个文本节点
+
+- createCommentVNode
+  快速创建一个注释节点
+
+- normalizeVNode
+  参数是一个 children，目的是将这个 children 处理成 vnode,如果是 null 或者是 boolean 类型的参数, 则直接创建一个注释节点；如果是一个数组就将这个数组用 Fragment 包裹起来; 如果本来就是一个 vnode，则将这个 vnode 克隆一份出来；其他情况的话就默认创建一个文本节点
+
+- normalizeChildren
+  处理 vnode 的 children, 给 vnode 加上 ShapeFlag 标识。如果 children 是一个函数，则这个函数默认按 SLOT_CHILDREN 处理; 如果 children 是一个对象，分两种情况处理：1.vnode 的 type 是一个对象，则就直接当插槽处理了 2. vnode 的 type 是一个 string 类型的，则说明是 dom 元素，默认将对象的 default 对象的执行结果当作当前 vnode 的 children 递归处理。
+
+- isSameVNodeType
+  判断是否是相同的 vnode, 只要 vnode 的 key 和 type 都相同，则认为就是同一个 vnode，这在进行双端 diff 算法的时候有重要作用
+
+- h
+  h 函数实际上是对 createVNode 的一种封装，更好的暴露给用户使用
+  1. 如果参数只有两个的话， 1.1 如果第二个参数是一个对象 且是一个 vnode 直接当 children 处理， [propsOrChildren] 1.2 否则直接当 children 处理
+  2. 如果是三个参数的话 2.1 第三个参数是 vnode，则将其用数组包一下 [children]
+  3. 大于三个参数 从第三个开始都当 children 处理
+
+关键数据结构
+
+VNode
+
+Component
+
+经典问题总结
+
+1. 自定义渲染器的执行过程？
+
+2. 挂载 app 上的方法是如何实现的？
+
+3. patch 的执行过程
+
+4. openBlock、closeBlock、setupBlock 是如何工作的？
+
+5. 为什么需要使用 nextTick 才能拿到组件更新后的内容？
+
+6. 组件代理对象是如何实现的, 为什么在 render 里面可以直接使用 setup 返回的数据？
+
+7. api/ inject、provide 是如何实现的？
+
+8. 组件生命周期的实现原理，以及调用时机？
+
+9. 组件的 emit 是如何实现组件通信的？
+
+10. 组件的插槽实现原理分析？
+
+11. 在 vue 中是如何实现错误捕获机制的？
+
+12. 警告机制是如何拿到嵌套的 instance 实例的？
+
+### 编译原理
