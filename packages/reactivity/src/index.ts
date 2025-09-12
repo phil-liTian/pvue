@@ -14,6 +14,7 @@ export {
   markRaw,
   toRaw,
   toReactive,
+  toReadonly,
   type Raw,
   type Reactive,
 } from './reactive'

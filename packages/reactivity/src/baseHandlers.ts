@@ -13,7 +13,14 @@ import {
   makeMap,
 } from '@pvue/shared'
 import { ReactiveFlags, TrackOpTypes, TriggerOpTypes } from './constants'
-import { Target, reactive, reactiveMap, readonly, toRaw } from './reactive'
+import {
+  Target,
+  isReadonly,
+  reactive,
+  reactiveMap,
+  readonly,
+  toRaw,
+} from './reactive'
 import { ITERATE_KEY, track, trigger } from './dep'
 import { arrayInstrumentations } from './arrayInstrumentations'
 import { isRef } from './ref'
@@ -36,7 +43,7 @@ class BaseReactiveHandler implements ProxyHandler<Target> {
     const isReadonly = this._isReadonly
 
     if (key === ReactiveFlags.IS_REACTIVE) {
-      return true
+      return !isReadonly
     } else if (key === ReactiveFlags.IS_SHALLOW) {
       return isShallow
     } else if (key === ReactiveFlags.IS_READONLY) {
@@ -57,6 +64,7 @@ class BaseReactiveHandler implements ProxyHandler<Target> {
 
     // 对array进行单独处理
     const targetIsArray = isArray(target)
+
     if (!isReadonly) {
       let fn: Function | undefined
       if (targetIsArray && (fn = arrayInstrumentations[key])) {
@@ -71,6 +79,9 @@ class BaseReactiveHandler implements ProxyHandler<Target> {
     }
 
     // ref wrapped in reactive should not track internal _value access
+
+    // 如果说target是ref类型, 这里的get也会触发响应的track, 也就实现了如果最外层对象是readonly的, 虽然响应式的数据不会被依赖收集，但是内部
+    // 的响应式数据发生变化, 还是可以通过triggerRef触发
     const res = Reflect.get(target, key, isRef(target) ? target : receiver)
 
     // 如果是symbol内置的key,或者系统定义的不需要依赖收集的key 则不做依赖收集
@@ -78,7 +89,9 @@ class BaseReactiveHandler implements ProxyHandler<Target> {
       return res
     }
 
-    track(target, TrackOpTypes.GET, key)
+    if (!isReadonly) {
+      track(target, TrackOpTypes.GET, key)
+    }
 
     if (isShallow) {
       return res
@@ -138,15 +151,22 @@ class MutableReactiveHandler extends BaseReactiveHandler {
 
   set(target: Target, key, value, receiver) {
     let oldValue = target[key]
+
+    const isOldValueReadonly = isReadonly(oldValue)
     // 先改变对象的value
-    if (!this._isShallow) {
+    if (!this._isShallow && !isReadonly(value)) {
       value = toRaw(value)
 
       // test: should work like a normal property when nested in a reactive object
       // 新的value不是ref, old是ref类型的 可以直接通过改变oldValue的value属性 触发ref的trigger
       if (!isArray(target) && !isRef(value) && isRef(oldValue)) {
-        oldValue.value = value
-        return true
+        // 如果reactive原来的值是readonly的, 不允许修改
+        if (isOldValueReadonly) {
+          return false
+        } else {
+          oldValue.value = value
+          return true
+        }
       }
     }
 
@@ -202,6 +222,16 @@ class ReadonlyReactiveHandler extends BaseReactiveHandler {
 
     return true
   }
+
+  deleteProperty(target: Target, key: string | symbol): boolean {
+    if (__DEV__) {
+      warn(
+        `Delete operation on key "${String(key)}" failed: target is readonly.`,
+        target
+      )
+    }
+    return true
+  }
 }
 
 // reactive
@@ -215,3 +245,5 @@ export const readonlyHandlers = new ReadonlyReactiveHandler()
 
 // shallowReadonly
 export const shallowReadonlyHandlers = new ReadonlyReactiveHandler(true)
+
+// readonly basehandler里面 不会做依赖收集, 那么如何做强制的派发更新的呢

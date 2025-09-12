@@ -78,6 +78,9 @@ export function reactive<T extends Object>(target: T): Reactive<T>
  * @returns 响应式代理对象
  */
 export function reactive(target: Object) {
+  if (isReadonly(target)) {
+    return target
+  }
   return createReactiveObject(
     target,
     false,
@@ -147,6 +150,10 @@ export function toReactive<T extends unknown>(value: T) {
  * @returns 如果值是响应式对象则返回true，否则返回false
  */
 export function isReactive(value: unknown): boolean {
+  if (isReadonly(value)) {
+    return isReactive((value as Target)[ReactiveFlags.RAW])
+  }
+
   return !!(value && (value as Target)[ReactiveFlags.IS_REACTIVE])
 }
 
@@ -176,6 +183,7 @@ function createReactiveObject(
   proxyMap: WeakMap<Target, any>
 ) {
   // 如果本来就是reactive对象, 再使用reactive包裹时, 直接返回原对象
+
   if (
     target[ReactiveFlags.RAW] &&
     !(isReadonly && target[ReactiveFlags.IS_REACTIVE])

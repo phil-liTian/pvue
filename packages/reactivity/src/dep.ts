@@ -51,6 +51,10 @@ export class Dep {
   subsHead?: Link
   map?: KeyToDepMap = undefined
   key?: unknown = undefined
+
+  // 需要注意的是dep也是无需被track的
+  readonly __v_skip = true
+
   constructor(public computed?: ComputedRefImpl | undefined) {
     if (__DEV__) {
       this.subsHead = undefined

@@ -37,7 +37,6 @@ const getProto = <T extends CollectionTypes>(v: T): any =>
 function createReadonlyMethod(type: TriggerOpTypes): Function {
   return function (this, ...args: unknown[]) {
     if (__DEV__) {
-      console.log('args', args)
       const key = args[0] ? `on key "${args[0]}" ` : ''
 
       warn(
