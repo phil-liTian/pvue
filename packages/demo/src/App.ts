@@ -11,10 +11,11 @@ import { RendererElement } from './examples/rendererElement'
 import { RendererAttrsFallthrough } from './examples/rendererAttrsFallthrough'
 import { ApiCreateApp } from './examples/apiCreateApp'
 import { ApiWatch } from './examples/apiWatch'
+import { Compiler } from './examples/compiler/index'
 
 export const App = {
   render() {
-    return h(ApiWatch)
+    return h(Compiler)
   },
 
   setup() {

@@ -4,6 +4,7 @@ export enum NodeTypes {
   ROOT,
   ELEMENT,
   TEXT,
+  SIMPLE_EXPRESSION,
 }
 
 export const locStub: SourceLocation = {
@@ -29,9 +30,16 @@ export interface Node {
   loc: SourceLocation
 }
 
+export type ExpressionNode = SimpleExpressionNode
+
+export type JSChildNode = ExpressionNode
+
 export interface RootNode extends Node {
   children: TemplateChildNode[]
   source: string
+  helpers: Set<symbol>
+
+  codegenNode?: JSChildNode
 }
 
 export interface TextNode extends Node {
@@ -40,6 +48,12 @@ export interface TextNode extends Node {
 
 export interface ELementNode extends Node {
   type: NodeTypes.ELEMENT
+}
+
+export interface SimpleExpressionNode extends Node {
+  type: NodeTypes.SIMPLE_EXPRESSION
+  content: string
+  isStatic: boolean
 }
 
 export function createRoot(
@@ -51,5 +65,19 @@ export function createRoot(
     loc: locStub,
     children,
     source,
+    helpers: new Set(),
+  }
+}
+
+export function createSimpleExpression(
+  content: SimpleExpressionNode['content'],
+  isStatic: SimpleExpressionNode['isStatic'] = false,
+  loc: SourceLocation = locStub
+): SimpleExpressionNode {
+  return {
+    type: NodeTypes.SIMPLE_EXPRESSION,
+    content,
+    isStatic,
+    loc,
   }
 }

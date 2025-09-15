@@ -173,7 +173,7 @@ export class Link {
 12. onEffectCleanup
     在 effect 执行完毕之后，执行的清空操作
 
-13. onTrack 和 onTrigger 为什么会被需要？
+13. onTrack 和 onTrigger 为什么会被设计？
     在 track 的时候收集关键信息，确保执行过程是预期结果。在 Trigger 的时候 检查 value 和 oldvalue 等相关信息是否正确。DebuggerEventExtraInfo 是触发的关键信息
 
 ### 运行时核心
@@ -258,3 +258,5 @@ Component
 12. 警告机制是如何拿到嵌套的 instance 实例的？
 
 ### 编译原理
+
+Vue3 编译原理核心流程体现为 "模板到渲染函数的优化式转化"：首先通过解析器将模板字符串转化为带位置信息的 AST（抽象语法树），随后遍历 AST 进行标记优化（如静态节点标记 PatchFlags、树结构扁平化）与静态提升（将不参与更新的节点 / 属性提取至渲染函数外），接着由转换模块处理指令（v-if/v-for 等）、事件绑定等特殊语法并生成对应的 JavaScript 表达式，最后由代码生成器将优化后的 AST 转换为可执行的渲染函数（含\_createVNode、\_setupRenderEffect 等运行时 API 调用），使编译产物能直接与运行时的虚拟 DOM 渲染逻辑对接，通过 "编译期预判" 减少运行时 Diff 计算量，实现 "编译优化 - 运行时渲染" 的协同增效。
