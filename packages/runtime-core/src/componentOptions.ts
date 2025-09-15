@@ -17,7 +17,7 @@ interface LegacyOptions {
   created?: () => any
 
   // componsition
-  mixins: any[]
+  mixins?: any[]
 }
 
 export interface ComponentOptionsBase extends LegacyOptions {
@@ -25,6 +25,7 @@ export interface ComponentOptionsBase extends LegacyOptions {
   render?: Function
   setup?: Function
   inheritAttrs?: boolean
+  template?: string
   components?: any
 }
 

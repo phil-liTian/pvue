@@ -1,8 +1,15 @@
-import { JSChildNode, NodeTypes, RootNode, SimpleExpressionNode } from './ast'
+import {
+  JSChildNode,
+  NodeTypes,
+  RootNode,
+  SimpleExpressionNode,
+  TemplateChildNode,
+  TextNode,
+} from './ast'
 import { CodegenOptions } from './options'
 import { helperNameMap } from './runtimeHelpers'
 
-type CodegenNode = JSChildNode
+type CodegenNode = JSChildNode | TemplateChildNode
 
 enum NewlineType {
   Start = 0,
@@ -43,6 +50,12 @@ function genModulePreamble(ast: RootNode, context: CodegenContext) {
   newline()
 
   push('export ')
+}
+
+function genFunctionPreamble(ast: RootNode, context: CodegenContext) {
+  const { newline, push } = context
+  newline()
+  push('return ')
 }
 
 function createCodegenContext(
@@ -87,11 +100,13 @@ function createCodegenContext(
 
 export function generate(
   ast: RootNode,
-  options: CodegenOptions
+  options: CodegenOptions = {}
 ): CodegenResult {
   const context = createCodegenContext(ast, options)
 
   const { mode, push, indent, deindent } = context
+
+  const useWithBlock = mode === 'function'
 
   const helpers = Array.from(ast.helpers)
   const hasHelpers = helpers.length > 0
@@ -99,6 +114,9 @@ export function generate(
   // mode指定为module
   if (mode === 'module') {
     genModulePreamble(ast, context)
+  } else {
+    //
+    genFunctionPreamble(ast, context)
   }
 
   const functionName = 'render'
@@ -109,10 +127,21 @@ export function generate(
   push(`function ${functionName}(${signature}) {`)
   indent()
 
+  if (useWithBlock) {
+    push('with (_ctx) {')
+    indent()
+  }
+
   push('return ')
 
   if (ast.codegenNode) {
     genNode(ast.codegenNode, context)
+  }
+
+  // test
+  if (useWithBlock) {
+    deindent()
+    push('}')
   }
 
   deindent()
@@ -129,10 +158,19 @@ function genNode(node: CodegenNode, context: CodegenContext) {
       genExpression(node, context)
       break
     }
+
+    case NodeTypes.TEXT: {
+      genText(node, context)
+      break
+    }
   }
 }
 
 function genExpression(node: SimpleExpressionNode, context: CodegenContext) {
   const { content, isStatic } = node
   context.push(content)
+}
+
+function genText(node: TextNode, context: CodegenContext) {
+  context.push(JSON.stringify(node.content))
 }

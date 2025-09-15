@@ -31,7 +31,11 @@ importers:
         specifier: ^8.38.0
         version: 8.38.0(eslint@9.32.0)(typescript@5.8.3)
 
-  packages/compiler-core: {}
+  packages/compiler-core:
+    devDependencies:
+      '@pvue/shared':
+        specifier: workspace:*
+        version: link:../shared
 
   packages/compiler-dom:
     devDependencies:

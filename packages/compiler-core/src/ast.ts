@@ -1,5 +1,3 @@
-export type TemplateChildNode = any
-
 export enum NodeTypes {
   ROOT,
   ELEMENT,
@@ -30,16 +28,23 @@ export interface Node {
   loc: SourceLocation
 }
 
+export interface TextNode extends Node {
+  type: NodeTypes.TEXT
+  content: string
+}
+
 export type ExpressionNode = SimpleExpressionNode
 
 export type JSChildNode = ExpressionNode
+
+export type TemplateChildNode = TextNode
 
 export interface RootNode extends Node {
   children: TemplateChildNode[]
   source: string
   helpers: Set<symbol>
 
-  codegenNode?: JSChildNode
+  codegenNode?: JSChildNode | TemplateChildNode
 }
 
 export interface TextNode extends Node {

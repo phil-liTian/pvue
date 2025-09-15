@@ -297,6 +297,16 @@ export function finishComponentSetup(
 ) {
   const Component = instance.type
 
+  if (!instance.render) {
+    if (compiler) {
+      const template = Component.template
+
+      if (template) {
+        Component.render = compiler(template)
+      }
+    }
+  }
+
   if (Component.render) {
     instance.render = Component.render
   }
@@ -351,4 +361,12 @@ export function createSetupContext(instance: ComponentInternalInstance) {
     slots,
     emit,
   }
+}
+
+let compiler: any
+
+// 打通compiler和runtime的流程
+
+export function registerRuntimeCompiler(_compiler: any): void {
+  compiler = _compiler
 }

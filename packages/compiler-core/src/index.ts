@@ -13,4 +13,8 @@ export {
 
 export { generate } from './codegen'
 
+export { baseCompile } from './compile'
+
+export { transform } from './transform'
+
 export type { CodegenOptions } from './options'

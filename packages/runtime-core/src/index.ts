@@ -56,3 +56,5 @@ export {
   flushPostFlushCbs,
   type SchedulerJob,
 } from './scheduler'
+
+export { registerRuntimeCompiler } from './component'

@@ -30,4 +30,18 @@ describe('compiler: codegen', () => {
     )
     expect(code).toMatchSnapshot()
   })
+
+  test('static text', () => {
+    const { code } = generate(
+      createRoot({
+        codegenNode: {
+          type: NodeTypes.TEXT,
+          content: 'hello',
+          loc: locStub,
+        },
+      })
+    )
+    expect(code).toMatch(`return "hello"`)
+    expect(code).toMatchSnapshot()
+  })
 })

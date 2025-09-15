@@ -7,3 +7,12 @@ export function render(_ctx, _cache) {
   return null
 }"
 `;
+
+exports[`compiler: codegen > static text 1`] = `
+"
+return function render(_ctx, _cache) {
+  with (_ctx) {
+    return "hello"
+  }
+}"
+`;
