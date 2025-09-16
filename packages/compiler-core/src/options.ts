@@ -6,3 +6,11 @@ export interface CodegenOptions {
    */
   runtimeModuleName?: string
 }
+
+export interface ErrorHandlingOptions {
+  onError: (error) => void
+}
+
+export interface ParserOptions extends ErrorHandlingOptions {
+  isVoidTag?: (tag: string) => boolean
+}

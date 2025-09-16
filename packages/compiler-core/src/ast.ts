@@ -3,6 +3,7 @@ export enum NodeTypes {
   ELEMENT,
   TEXT,
   SIMPLE_EXPRESSION,
+  INTERPOLATION,
 }
 
 export const locStub: SourceLocation = {
@@ -33,11 +34,18 @@ export interface TextNode extends Node {
   content: string
 }
 
+export interface InterpolationNode extends Node {
+  type: NodeTypes.INTERPOLATION
+  content: string
+}
+
 export type ExpressionNode = SimpleExpressionNode
 
 export type JSChildNode = ExpressionNode
 
-export type TemplateChildNode = TextNode
+export type TemplateChildNode = TextNode | InterpolationNode
+
+export type ElementNode = any
 
 export interface RootNode extends Node {
   children: TemplateChildNode[]
