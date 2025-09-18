@@ -1,3 +1,5 @@
+import { NodeTransform } from './transform'
+
 export interface CodegenOptions {
   mode?: 'module' | 'function'
   /**
@@ -8,9 +10,21 @@ export interface CodegenOptions {
 }
 
 export interface ErrorHandlingOptions {
-  onError: (error) => void
+  onError?: (error) => void
 }
 
 export interface ParserOptions extends ErrorHandlingOptions {
   isVoidTag?: (tag: string) => boolean
+  comments?: boolean
+}
+
+export interface SharedTransformCodegenOptions {
+  filename?: string
+}
+
+export interface TransformOptions
+  extends SharedTransformCodegenOptions,
+    ErrorHandlingOptions {
+  // 对ast进行转换的transform集合
+  nodeTransforms?: NodeTransform[]
 }

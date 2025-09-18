@@ -7,6 +7,6 @@ import { transform } from './transform'
 export function baseCompile(source: string | RootNode) {
   const ast = isString(source) ? baseParse(source) : source
 
-  transform(ast)
+  transform(ast, {})
   return generate(ast, {})
 }

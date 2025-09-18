@@ -1,4 +1,10 @@
-import { ElementNode, NodeTypes, TextNode } from '../src/ast'
+import {
+  ConstantTypes,
+  ElementNode,
+  InterpolationNode,
+  NodeTypes,
+  TextNode,
+} from '../src/ast'
 import { ErrorCodes } from '../src/errors'
 import { baseParse } from '../src/parser'
 
@@ -161,6 +167,33 @@ describe('compiler: parse', () => {
           start: { offset: 0, line: 1, column: 1 },
           end: { offset: 6, line: 1, column: 7 },
           source: 'a {{ b',
+        },
+      })
+    })
+  })
+
+  describe('Interpolation', () => {
+    test.skip('simple interpolation', () => {
+      const ast = baseParse('{{message}}')
+      const interpolation = ast.children[0] as InterpolationNode
+
+      expect(interpolation).toStrictEqual({
+        type: NodeTypes.INTERPOLATION,
+        content: {
+          type: NodeTypes.SIMPLE_EXPRESSION,
+          content: `message`,
+          isStatic: false,
+          constType: ConstantTypes.NOT_CONSTANT,
+          loc: {
+            start: { offset: 2, line: 1, column: 3 },
+            end: { offset: 9, line: 1, column: 10 },
+            source: 'message',
+          },
+        },
+        loc: {
+          start: { offset: 0, line: 1, column: 1 },
+          end: { offset: 11, line: 1, column: 12 },
+          source: '{{message}}',
         },
       })
     })
