@@ -1,4 +1,5 @@
 import { PatchFlags } from '@pvue/shared'
+import { TransformContext } from './transform'
 
 export enum NodeTypes {
   ROOT,
@@ -8,6 +9,9 @@ export enum NodeTypes {
   INTERPOLATION,
   DIRECTIVE,
   COMMENT,
+
+  // container
+  IF,
 
   // codegen
   VNODE_CALL,
@@ -57,8 +61,11 @@ export interface InterpolationNode extends Node {
 export interface VNodeCall extends Node {
   tag: string | symbol
   props: undefined
-  children: TemplateChildNode[]
+  children: TemplateChildNode[] | undefined
   patchFlag: PatchFlags | undefined
+  dynamicProps: string | undefined
+  directives: undefined
+  isBlock: boolean
 }
 
 export type ExpressionNode = SimpleExpressionNode
@@ -139,5 +146,33 @@ export function createSimpleExpression(
     content,
     isStatic,
     loc,
+  }
+}
+
+export function createVNodeCall(
+  context: TransformContext | null,
+  tag: VNodeCall['tag'],
+  props?: VNodeCall['props'],
+  children?: VNodeCall['children'],
+  patchFlag?: VNodeCall['patchFlag'],
+  dynamicProps?: VNodeCall['dynamicProps'],
+  directives?: VNodeCall['directives'],
+  isBlock: VNodeCall['isBlock'] = false
+) {
+  return {
+    type: NodeTypes.VNODE_CALL,
+    tag,
+    props,
+    children,
+    patchFlag,
+    dynamicProps,
+    directives,
+    isBlock,
+  }
+}
+
+export function convertToBlock(node: VNodeCall, {}: TransformContext) {
+  if (!node.isBlock) {
+    node.isBlock = true
   }
 }

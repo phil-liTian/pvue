@@ -1,6 +1,9 @@
-import { camelize, capitalize, isString, NOOP } from '@pvue/shared'
+import { camelize, capitalize, isArray, isString, NOOP } from '@pvue/shared'
 import {
+  convertToBlock,
   createSimpleExpression,
+  DirectiveNode,
+  ElementNode,
   JSChildNode,
   NodeTypes,
   ParentNode,
@@ -11,6 +14,7 @@ import {
 import { TransformOptions } from './options'
 import { defaultOnError } from './errors'
 import { CREATE_COMMENT, TO_DISPLAY_STRING } from './runtimeHelpers'
+import { getSingleElementRoot } from './transforms/cacheStatic'
 
 export interface TransformContext extends Required<TransformOptions> {
   selfName: string | null
@@ -34,7 +38,7 @@ export interface TransformContext extends Required<TransformOptions> {
 export type NodeTransform = (
   node: RootNode | TemplateChildNode,
   context: TransformContext
-) => void
+) => void | (() => void) | (() => void)[]
 
 export function createTransformContext(
   root: RootNode,
@@ -123,8 +127,16 @@ function traverseNode(
 ) {
   context.currentNode = node
   const { nodeTransforms } = context
+  let exitFns: (() => void)[] = []
   for (let i = 0; i < nodeTransforms.length; i++) {
     const onExit = nodeTransforms[i](node, context)
+    if (onExit) {
+      if (isArray(onExit)) {
+        exitFns.push(...onExit)
+      } else {
+        exitFns.push(onExit)
+      }
+    }
 
     // 执行removeNode会将currentNode清空，清空后的node不再继续遍历
     if (!context.currentNode) {
@@ -151,6 +163,12 @@ function traverseNode(
       break
     }
   }
+
+  let i = exitFns.length
+
+  while (i--) {
+    exitFns[i]()
+  }
 }
 
 function traverseChildren(parent: ParentNode, context: TransformContext) {
@@ -173,16 +191,60 @@ function traverseChildren(parent: ParentNode, context: TransformContext) {
   }
 }
 
-function createRootCodegen(root: RootNode) {
+function createRootCodegen(root: RootNode, context: TransformContext) {
   const { children } = root
-  root.codegenNode = children[0]
+
+  // 单根节点
+  if (children.length === 1) {
+    const singleElementRootChild = getSingleElementRoot(root)
+    if (singleElementRootChild && singleElementRootChild.codegenNode) {
+      // 这里的codegenNode实际都是在各个transform中生成的
+      const codegenNode = singleElementRootChild.codegenNode
+
+      // VNODE_CALL类型 转换成isBlock
+      if (codegenNode.type === NodeTypes.VNODE_CALL) {
+        convertToBlock(codegenNode, context)
+      }
+
+      root.codegenNode = codegenNode
+    } else {
+      root.codegenNode = children[0]
+    }
+  } else {
+    root.codegenNode = children[0]
+  }
 }
 
 export function transform(root: RootNode, options: TransformOptions) {
   const context = createTransformContext(root, options)
   traverseNode(root, context)
-  createRootCodegen(root)
+  // 给root挂上codegenNode, 用到codegen函数中生成render函数
+  createRootCodegen(root, context)
 
   root.hoists = context.hoists
   root.helpers = new Set([...context.helpers.keys()])
+}
+
+export type StructuralDirectiveTransform = (
+  node: ElementNode,
+  dir: DirectiveNode,
+  context: TransformContext
+) => (() => void) | void
+
+export function createStructuralDirectiveTransform(
+  name: string | RegExp,
+  fn: StructuralDirectiveTransform
+): NodeTransform {
+  const matches = isString(name) ? n => n === name : n => name.test(n)
+  return (node, context) => {
+    if (node.type === NodeTypes.ELEMENT) {
+      const { props } = node
+      for (let i = 0; i < props.length; i++) {
+        const prop = props[i]
+        if (matches(prop.name)) {
+          fn(node, prop, context)
+        }
+      }
+    }
+  }
 }

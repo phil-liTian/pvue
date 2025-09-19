@@ -26,6 +26,7 @@ export enum State {
   // attrs
   BeforeAttrName,
   InDirArg, // 例如处理 :后面的属性
+  InDirName, // 例如 v- 后面的name
   AfterAttrName,
   BeforeAttrValue,
   InAttrValueDq,
@@ -59,6 +60,8 @@ export enum CharCodes {
 
   ExclamationMark = 0x21, // "!"
   Dash = 0x2d, // "-"
+
+  LowerV = 0x76, // "v"
 }
 
 const defaultDelimitersOpen = new Uint8Array([123, 123]) // "{{"
@@ -268,6 +271,14 @@ export default class Tokenizer {
     }
   }
 
+  // v- 后面的内容
+  private stateInDirName(c: number) {
+    if (c === CharCodes.Eq) {
+      this.cbs.ondirname(this.sectionStart, this.index)
+      this.handleAttrNameEnd(c)
+    }
+  }
+
   private stateAfterAttrName(c: number) {
     if (c === CharCodes.Eq) {
       this.state = State.BeforeAttrValue
@@ -326,7 +337,12 @@ export default class Tokenizer {
   }
 
   private handleAttrStart(c: number) {
-    if (c === CharCodes.Colon) {
+    if (c === CharCodes.LowerV && this.peek() === CharCodes.Dash) {
+      // v-
+      this.state = State.InDirName
+      this.sectionStart = this.index
+    } else if (c === CharCodes.Colon) {
+      // <div :id='foo' /> 中 :
       this.cbs.ondirname(this.index, this.index + 1)
       this.state = State.InDirArg
       this.sectionStart = this.index + 1
@@ -370,6 +386,10 @@ export default class Tokenizer {
       column,
       offset: index,
     }
+  }
+
+  private peek() {
+    return this.buffer.charCodeAt(this.index + 1)
   }
 
   public parse(input: string): void {
@@ -417,6 +437,12 @@ export default class Tokenizer {
         // 处理属性
         case State.InDirArg: {
           this.stateInDirArg(c)
+          break
+        }
+
+        // 处理属性名
+        case State.InDirName: {
+          this.stateInDirName(c)
           break
         }
 

@@ -160,7 +160,7 @@ const tokenizer = new Tokenizer(stack, {
 
   ondirname(start, endIndex) {
     const raw = getSlice(start, endIndex)
-    const name = raw === ':' ? 'bind' : ''
+    const name = raw === ':' ? 'bind' : raw.slice(2)
 
     currentProp = {
       type: NodeTypes.DIRECTIVE,
@@ -174,6 +174,7 @@ const tokenizer = new Tokenizer(stack, {
 
   ondirarg(start, endIndex) {
     const arg = getSlice(start, endIndex)
+
     const isStatic = arg[0] !== '['
     ;(currentProp as DirectiveNode).arg = createExp(
       arg,

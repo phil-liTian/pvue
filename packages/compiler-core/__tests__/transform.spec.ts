@@ -13,6 +13,8 @@ import {
   TO_DISPLAY_STRING,
 } from '../src/runtimeHelpers'
 import { NodeTransform } from '../src/transform'
+import { transformElement } from '../src/transforms/transformElement'
+import { transformIf } from '../src/transforms/vIf'
 
 describe('compiler: transform', () => {
   test('context state', () => {
@@ -252,55 +254,63 @@ describe('compiler: transform', () => {
     expect(ast.helpers).toContain(CREATE_COMMENT)
   })
 
-  // describe.skip('root codegenNode', () => {
-  //   function transformWithCodegen(template: string) {
-  //     const ast = baseParse(template)
-  //     transform(ast, {
-  //       nodeTransforms: [
-  //         // transformIf,
-  //         // transformFor,
-  //         // transformText,
-  //         // transformSlotOutlet,
-  //         // transformElement,
-  //       ],
-  //     })
-  //     return ast
-  //   }
+  describe('root codegenNode', () => {
+    function transformWithCodegen(template: string) {
+      const ast = baseParse(template)
+      transform(ast, {
+        nodeTransforms: [
+          transformIf,
+          // transformFor,
+          // transformText,
+          // transformSlotOutlet,
+          transformElement,
+        ],
+      })
+      return ast
+    }
 
-  //   function createBlockMatcher(
-  //     tag: VNodeCall['tag'],
-  //     props?: VNodeCall['props'],
-  //     children?: VNodeCall['children'],
-  //     patchFlag?: VNodeCall['patchFlag']
-  //   ) {
-  //     return {
-  //       type: NodeTypes.VNODE_CALL,
-  //       isBlock: true,
-  //       tag,
-  //       props,
-  //       children,
-  //       patchFlag,
-  //     }
-  //   }
+    function createBlockMatcher(
+      tag: VNodeCall['tag'],
+      props?: VNodeCall['props'],
+      children?: VNodeCall['children'],
+      patchFlag?: VNodeCall['patchFlag']
+    ) {
+      return {
+        type: NodeTypes.VNODE_CALL,
+        isBlock: true,
+        tag,
+        props,
+        children,
+        patchFlag,
+      }
+    }
 
-  //   test('no children', () => {
-  //     const ast = transformWithCodegen(``)
-  //     expect(ast.codegenNode).toBeUndefined()
-  //   })
+    test('no children', () => {
+      const ast = transformWithCodegen(``)
+      expect(ast.codegenNode).toBeUndefined()
+    })
 
-  //   test.skip('single <slot/>', () => {
-  //     const ast = transformWithCodegen(`<slot/>`)
-  //     expect(ast.codegenNode).toMatchObject({
-  //       codegenNode: {
-  //         type: NodeTypes.JS_CALL_EXPRESSION,
-  //         callee: RENDER_SLOT,
-  //       },
-  //     })
-  //   })
+    test.only('single <slot/>', () => {
+      const ast = transformWithCodegen(`<slot/>`)
+      expect(ast.codegenNode).toMatchObject({
+        codegenNode: {
+          type: NodeTypes.JS_CALL_EXPRESSION,
+          callee: RENDER_SLOT,
+        },
+      })
+    })
 
-  //   test.only('single element', () => {
-  //     const ast = transformWithCodegen(`<div/>`)
-  //     expect(ast.codegenNode).toMatchObject(createBlockMatcher(`"div"`))
-  //   })
-  // })
+    test('single element', () => {
+      const ast = transformWithCodegen(`<div/>`)
+      expect(ast.codegenNode).toMatchObject(createBlockMatcher(`"div"`))
+    })
+
+    test('root v-if', () => {
+      const ast = transformWithCodegen(`<div v-if="ok" />`)
+
+      expect(ast.codegenNode).toMatchObject({
+        type: NodeTypes.IF,
+      })
+    })
+  })
 })
