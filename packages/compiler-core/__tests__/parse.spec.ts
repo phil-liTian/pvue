@@ -1,7 +1,10 @@
 import {
+  CommentNode,
   ConstantTypes,
   ElementNode,
+  ElementType,
   InterpolationNode,
+  Namespaces,
   NodeTypes,
   TextNode,
 } from '../src/ast'
@@ -173,7 +176,7 @@ describe('compiler: parse', () => {
   })
 
   describe('Interpolation', () => {
-    test.skip('simple interpolation', () => {
+    test('simple interpolation', () => {
       const ast = baseParse('{{message}}')
       const interpolation = ast.children[0] as InterpolationNode
 
@@ -194,6 +197,268 @@ describe('compiler: parse', () => {
           start: { offset: 0, line: 1, column: 1 },
           end: { offset: 11, line: 1, column: 12 },
           source: '{{message}}',
+        },
+      })
+    })
+
+    test('it can have tag-like notation', () => {
+      const ast = baseParse('{{ a<b }}')
+      const interpolation = ast.children[0] as InterpolationNode
+
+      expect(interpolation).toStrictEqual({
+        type: NodeTypes.INTERPOLATION,
+        content: {
+          type: NodeTypes.SIMPLE_EXPRESSION,
+          content: `a<b`,
+          isStatic: false,
+          constType: ConstantTypes.NOT_CONSTANT,
+          loc: {
+            start: { offset: 3, line: 1, column: 4 },
+            end: { offset: 6, line: 1, column: 7 },
+            source: 'a<b',
+          },
+        },
+        loc: {
+          start: { offset: 0, line: 1, column: 1 },
+          end: { offset: 9, line: 1, column: 10 },
+          source: '{{ a<b }}',
+        },
+      })
+    })
+
+    test('it can have tag-like notation (2)', () => {
+      const ast = baseParse('{{ a<b }}{{ c>d }}')
+      const interpolation1 = ast.children[0] as InterpolationNode
+      const interpolation2 = ast.children[1] as InterpolationNode
+
+      expect(interpolation1).toStrictEqual({
+        type: NodeTypes.INTERPOLATION,
+        content: {
+          type: NodeTypes.SIMPLE_EXPRESSION,
+          content: `a<b`,
+          isStatic: false,
+          constType: ConstantTypes.NOT_CONSTANT,
+          loc: {
+            start: { offset: 3, line: 1, column: 4 },
+            end: { offset: 6, line: 1, column: 7 },
+            source: 'a<b',
+          },
+        },
+        loc: {
+          start: { offset: 0, line: 1, column: 1 },
+          end: { offset: 9, line: 1, column: 10 },
+          source: '{{ a<b }}',
+        },
+      })
+
+      expect(interpolation2).toStrictEqual({
+        type: NodeTypes.INTERPOLATION,
+        content: {
+          type: NodeTypes.SIMPLE_EXPRESSION,
+          isStatic: false,
+          constType: ConstantTypes.NOT_CONSTANT,
+          content: 'c>d',
+          loc: {
+            start: { offset: 12, line: 1, column: 13 },
+            end: { offset: 15, line: 1, column: 16 },
+            source: 'c>d',
+          },
+        },
+        loc: {
+          start: { offset: 9, line: 1, column: 10 },
+          end: { offset: 18, line: 1, column: 19 },
+          source: '{{ c>d }}',
+        },
+      })
+    })
+
+    test('it can have tag-like notation (3)', () => {
+      const ast = baseParse('<div>{{ "</div>" }}</div>')
+      const element = ast.children[0] as ElementNode
+      const interpolation = element.children[0] as InterpolationNode
+
+      expect(interpolation).toStrictEqual({
+        type: NodeTypes.INTERPOLATION,
+        content: {
+          type: NodeTypes.SIMPLE_EXPRESSION,
+          isStatic: false,
+          // The `constType` is the default value and will be determined in `transformExpression`.
+          constType: ConstantTypes.NOT_CONSTANT,
+          content: '"</div>"',
+          loc: {
+            start: { offset: 8, line: 1, column: 9 },
+            end: { offset: 16, line: 1, column: 17 },
+            source: '"</div>"',
+          },
+        },
+        loc: {
+          start: { offset: 5, line: 1, column: 6 },
+          end: { offset: 19, line: 1, column: 20 },
+          source: '{{ "</div>" }}',
+        },
+      })
+    })
+
+    test('custom delimiters', () => {
+      const ast = baseParse('<p>{msg}</p>', {
+        delimiters: ['{', '}'],
+      })
+      const element = ast.children[0] as ElementNode
+      const interpolation = element.children[0] as InterpolationNode
+
+      expect(interpolation).toStrictEqual({
+        type: NodeTypes.INTERPOLATION,
+        content: {
+          type: NodeTypes.SIMPLE_EXPRESSION,
+          content: `msg`,
+          isStatic: false,
+          constType: ConstantTypes.NOT_CONSTANT,
+          loc: {
+            start: { offset: 4, line: 1, column: 5 },
+            end: { offset: 7, line: 1, column: 8 },
+            source: 'msg',
+          },
+        },
+        loc: {
+          start: { offset: 3, line: 1, column: 4 },
+          end: { offset: 8, line: 1, column: 9 },
+          source: '{msg}',
+        },
+      })
+    })
+  })
+
+  describe('Comment', () => {
+    test('empty comment', () => {
+      const ast = baseParse('<!---->')
+      const comment = ast.children[0] as CommentNode
+
+      expect(comment).toStrictEqual({
+        type: NodeTypes.COMMENT,
+        content: '',
+        loc: {
+          start: { offset: 0, line: 1, column: 1 },
+          end: { offset: 7, line: 1, column: 8 },
+          source: '<!---->',
+        },
+      })
+    })
+
+    test('simple comment', () => {
+      const ast = baseParse('<!--abc-->')
+      const comment = ast.children[0] as CommentNode
+
+      expect(comment).toStrictEqual({
+        type: NodeTypes.COMMENT,
+        content: 'abc',
+        loc: {
+          start: { offset: 0, line: 1, column: 1 },
+          end: { offset: 10, line: 1, column: 11 },
+          source: '<!--abc-->',
+        },
+      })
+    })
+
+    test('two comments', () => {
+      const ast = baseParse('<!--abc--><!--def-->')
+      const comment1 = ast.children[0] as CommentNode
+      const comment2 = ast.children[1] as CommentNode
+
+      expect(comment1).toStrictEqual({
+        type: NodeTypes.COMMENT,
+        content: 'abc',
+        loc: {
+          start: { offset: 0, line: 1, column: 1 },
+          end: { offset: 10, line: 1, column: 11 },
+          source: '<!--abc-->',
+        },
+      })
+      expect(comment2).toStrictEqual({
+        type: NodeTypes.COMMENT,
+        content: 'def',
+        loc: {
+          start: { offset: 10, line: 1, column: 11 },
+          end: { offset: 20, line: 1, column: 21 },
+          source: '<!--def-->',
+        },
+      })
+    })
+
+    test('comments option', () => {
+      const astOptionNoComment = baseParse('<!--abc-->', { comments: false })
+      const astOptionWithComments = baseParse('<!--abc-->', { comments: true })
+
+      expect(astOptionNoComment.children).toHaveLength(0)
+      expect(astOptionWithComments.children).toHaveLength(1)
+    })
+
+    test('comments in the <pre> tag should be removed when comments option requires it', () => {
+      const rawText = `<p/><!-- foo --><p/>`
+
+      const astWithComments = baseParse(`<pre>${rawText}</pre>`, {
+        comments: true,
+      })
+      expect(
+        (astWithComments.children[0] as ElementNode).children
+      ).toMatchObject([
+        {
+          type: NodeTypes.ELEMENT,
+          tag: 'p',
+        },
+        {
+          type: NodeTypes.COMMENT,
+        },
+        {
+          type: NodeTypes.ELEMENT,
+          tag: 'p',
+        },
+      ])
+
+      const astWithoutComments = baseParse(`<pre>${rawText}</pre>`, {
+        comments: false,
+      })
+      expect(
+        (astWithoutComments.children[0] as ElementNode).children
+      ).toMatchObject([
+        {
+          type: NodeTypes.ELEMENT,
+          tag: 'p',
+        },
+        {
+          type: NodeTypes.ELEMENT,
+          tag: 'p',
+        },
+      ])
+    })
+  })
+
+  describe('Element', () => {
+    test('simple div', () => {
+      const ast = baseParse('<div>hello</div>')
+      const element = ast.children[0] as ElementNode
+
+      expect(element).toStrictEqual({
+        type: NodeTypes.ELEMENT,
+        ns: Namespaces.HTML,
+        tag: 'div',
+        tagType: ElementType.ELEMENT,
+        codegenNode: undefined,
+        props: [],
+        children: [
+          {
+            type: NodeTypes.TEXT,
+            content: 'hello',
+            loc: {
+              start: { offset: 5, line: 1, column: 6 },
+              end: { offset: 10, line: 1, column: 11 },
+              source: 'hello',
+            },
+          },
+        ],
+        loc: {
+          start: { offset: 0, line: 1, column: 1 },
+          end: { offset: 16, line: 1, column: 17 },
+          source: '<div>hello</div>',
         },
       })
     })

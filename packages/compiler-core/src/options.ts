@@ -1,3 +1,4 @@
+import { ElementNode, Namespace } from './ast'
 import { NodeTransform } from './transform'
 
 export interface CodegenOptions {
@@ -15,7 +16,14 @@ export interface ErrorHandlingOptions {
 
 export interface ParserOptions extends ErrorHandlingOptions {
   isVoidTag?: (tag: string) => boolean
+  delimiters?: [string, string]
   comments?: boolean
+  ns?: Namespace
+  getNamespace?: (
+    tag: string,
+    parent: ElementNode | undefined,
+    rootNameSpace: Namespace
+  ) => Namespace
 }
 
 export interface SharedTransformCodegenOptions {

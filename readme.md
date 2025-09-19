@@ -260,3 +260,85 @@ Component
 ### 编译原理
 
 Vue3 编译原理核心流程体现为 "模板到渲染函数的优化式转化"：首先通过解析器将模板字符串转化为带位置信息的 AST（抽象语法树），随后遍历 AST 进行标记优化（如静态节点标记 PatchFlags、树结构扁平化）与静态提升（将不参与更新的节点 / 属性提取至渲染函数外），接着由转换模块处理指令（v-if/v-for 等）、事件绑定等特殊语法并生成对应的 JavaScript 表达式，最后由代码生成器将优化后的 AST 转换为可执行的渲染函数（含\_createVNode、\_setupRenderEffect 等运行时 API 调用），使编译产物能直接与运行时的虚拟 DOM 渲染逻辑对接，通过 "编译期预判" 减少运行时 Diff 计算量，实现 "编译优化 - 运行时渲染" 的协同增效。
+
+代码体现为: baseParse 通过 tokenizer 的 parse 方法将 input 转化成 ast。这里的 parse 方法是一个状态机，处理字符串在不同状态间流转。然后通过 transform 处理 ast, 在 traverseNode 的时候，针对不同的 NodeType 使用不同 NodeTransform 处理。处理生成的 codegenNode，是在 codegen 中生成代码的核心对象。codegen 的结果就是一个 render 函数。
+
+核心点 1: prase 状态机的处理
+
+通过维护一系列离散状态（如初始状态、标签开始状态、属性解析状态、文本解析状态等），根据当前读取的模板字符类型（如<、>、{{、字母等）触发状态切换，并在对应状态下执行特定解析逻辑（如解析标签名、属性、插值、文本等），从而将模板字符串逐步转换为 AST 节点，高效处理嵌套结构、指令、注释等各种模板语法，确保解析过程的有序性和准确性。
+
+核心点 2: nodeTransform 的设计理念
+
+1. 将不同类型节点（如元素、文本、插值、指令等）的转换逻辑拆分为独立的 transform 函数，每个函数专注处理特定类型节点（如 transformElement 处理元素节点、transformText 处理文本节点），降低耦合性。
+2. 通过配置允许自定义 transform 函数，开发者可根据需求扩展编译逻辑（如自定义指令处理、特定语法转换），增强编译器灵活性
+3. 从后往前执行（即 AST 的后序遍历），核心是为了让父节点在处理时能获取子节点已完成转换的完整信息 —— 由于许多转换逻辑（如静态节点标记、指令关联、作用域分析等）依赖子节点的处理结果（如子节点是否为静态、是否包含特定指令等），先处理子节点再处理父节点，可确保父节点在转换时能基于子节点的最终状态做决策，避免因信息不全导致的错误判断或重复处理，同时保证模块化 transform 函数间的协同性，让整个转换流程更符合 AST 的嵌套结构逻辑。
+
+核心点 3: comiler 与 runtime 连接的核心逻辑
+在 runtime-core 中抛出方法 registerRuntimeCompiler, 接收一个 compileToFunction 函数，执行 compileToFunction 函数会返回一个 render 函数。函数的 code 是 compiler 中 generate 生成的。
+
+在 pvue 中将 compiler 和 runtime 串联起来的核心逻辑
+
+```js
+import { registerRuntimeCompiler } from '@pvue/runtime-core'
+function compileToFunction(template: string | HTMLElement) {
+  const { code } = compile(template as string)
+
+  // 只需要保留函数体中的内容
+  const funcBody = code.replace(/^function\s+\w*\([^)]*\)\s*\{|\}$/g, '').trim()
+
+  const render = new Function('PVue', funcBody)
+
+  // return render
+  return render
+}
+
+registerRuntimeCompiler(compileToFunction)
+
+```
+
+在 compiler-dom 中
+
+```js
+import { baseCompile, RootNode } from '@pvue/compiler-core'
+export function compile(src: string | RootNode) {
+  return baseCompile(src)
+}
+```
+
+在 compiler-core 中处理 baseCompile 的内容，使用 generate 生成一个 code
+
+```js
+export function baseCompile(source: string | RootNode) {
+  const ast = isString(source) ? baseParse(source) : source
+
+  transform(ast, {})
+  return generate(ast, {})
+}
+```
+
+在 runtime-core 中
+
+```js
+let compiler
+export function registerRuntimeCompiler(_compiler: any): void {
+  compiler = _compiler
+}
+
+export function finishComponentSetup(
+  instance: ComponentInternalInstance,
+  skipOptions?: boolean
+) {
+  const Component = instance.type
+  // ...
+  if (!instance.render) {
+    if (compiler) {
+      const template = Component.template
+
+      if (template) {
+        Component.render = compiler(template)
+      }
+    }
+  }
+  // ...
+}
+```

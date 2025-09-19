@@ -36,6 +36,12 @@ export enum ElementType {
   TEMPLATE,
 }
 
+export type Namespace = number
+
+export enum Namespaces {
+  HTML,
+}
+
 export const locStub: SourceLocation = {
   start: { line: 1, column: 1, offset: 0 },
   end: { line: 1, column: 1, offset: 0 },
@@ -121,6 +127,10 @@ export interface TextNode extends Node {
   type: NodeTypes.TEXT
 }
 
+export interface CommentNode extends Node {
+  type: NodeTypes.COMMENT
+}
+
 export interface ELementNode extends Node {
   type: NodeTypes.ELEMENT
 }
@@ -134,6 +144,7 @@ export interface SimpleExpressionNode extends Node {
   type: NodeTypes.SIMPLE_EXPRESSION
   content: string
   isStatic: boolean
+  constType: ConstantTypes
 }
 
 // <div :id='foo' />
@@ -169,13 +180,15 @@ export function createRoot(
 export function createSimpleExpression(
   content: SimpleExpressionNode['content'],
   isStatic: SimpleExpressionNode['isStatic'] = false,
-  loc: SourceLocation = locStub
+  loc: SourceLocation = locStub,
+  constType: ConstantTypes = ConstantTypes.NOT_CONSTANT
 ): SimpleExpressionNode {
   return {
     type: NodeTypes.SIMPLE_EXPRESSION,
     content,
     isStatic,
     loc,
+    constType,
   }
 }
 

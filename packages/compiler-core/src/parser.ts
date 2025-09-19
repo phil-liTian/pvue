@@ -6,6 +6,7 @@ import {
   DirectiveNode,
   type ElementNode,
   ElementType,
+  Namespaces,
   NodeTypes,
   RootNode,
   SimpleExpressionNode,
@@ -14,7 +15,7 @@ import {
 } from './ast'
 import { createCompilerError, defaultOnError, ErrorCodes } from './errors'
 import { ParserOptions } from './options'
-import Tokenizer, { CharCodes } from './tokenizer'
+import Tokenizer, { CharCodes, isWhitespace, toCharCodes } from './tokenizer'
 
 const stack: ElementNode = []
 let currentInput = ''
@@ -36,6 +37,9 @@ export type MergedParserOptions = Required<ParserOptions>
 export const defaultParserOptions: MergedParserOptions = {
   onError: defaultOnError,
   isVoidTag: NO,
+  getNamespace: () => Namespaces.HTML,
+  ns: Namespaces.HTML,
+  delimiters: ['{{', '}}'],
   comments: __DEV__,
 }
 
@@ -63,7 +67,7 @@ function onCloseTag(el: ElementNode, end: number) {
   setLocEnd(el.loc, lookAhead(end, CharCodes.Gt) + 1)
 
   const { tag } = el
-  console.log('tag', tag)
+
   if (tag === 'slot') {
     el.tagType = ElementType.SLOT
   }
@@ -88,9 +92,9 @@ function createExp(
   content: SimpleExpressionNode['content'],
   isStatic: SimpleExpressionNode['isStatic'] = false,
   loc: SourceLocation,
-  constType: ConstantTypes
+  constType: ConstantTypes = ConstantTypes.NOT_CONSTANT
 ) {
-  const exp = createSimpleExpression(content, isStatic, loc)
+  const exp = createSimpleExpression(content, isStatic, loc, constType)
 
   return exp
 }
@@ -101,15 +105,24 @@ const tokenizer = new Tokenizer(stack, {
   },
 
   oninterpolation(start, endIndex) {
-    const innerStart = start + tokenizer.delimiterOpen.length
-    const innerEnd = endIndex - tokenizer.delimiterClose.length
+    let innerStart = start + tokenizer.delimiterOpen.length
+    let innerEnd = endIndex - tokenizer.delimiterClose.length
+
+    // 去掉两边的空白区域
+    while (isWhitespace(currentInput.charCodeAt(innerStart))) {
+      innerStart++
+    }
+
+    while (isWhitespace(currentInput.charCodeAt(innerEnd - 1))) {
+      innerEnd--
+    }
 
     let exp = getSlice(innerStart, innerEnd)
 
     addNode({
       type: NodeTypes.INTERPOLATION,
       loc: getLoc(start, endIndex),
-      content: '',
+      content: createExp(exp, false, getLoc(innerStart, innerEnd)),
     })
   },
 
@@ -125,6 +138,8 @@ const tokenizer = new Tokenizer(stack, {
       loc: getLoc(start - 1, endIndex),
       // 这个属性在onCloseTag的时候会被重新定义 因为在结束的时候才知道是 slot、template、component还是说就是一个element类型
       tagType: ElementType.ELEMENT,
+      codegenNode: undefined,
+      ns: currentOptions.getNamespace(name, stack[0], currentOptions.ns),
     }
   },
 
@@ -141,11 +156,19 @@ const tokenizer = new Tokenizer(stack, {
       for (let i = 0; i < stack.length; i++) {
         const e = stack[i]
 
+        console.log('i', i)
+
         if (e.tag.toLowerCase() === name.toLowerCase()) {
           found = true
 
-          // 比较是相同节点之后 需要弹出栈顶元素 确保下次入栈的元素与当前元素处理到同一层级
-          stack.shift()
+          for (let j = 0; j <= i; j++) {
+            // onclosetag()
+            // 比较是相同节点之后 需要弹出栈顶元素 确保下次入栈的元素与当前元素处理到同一层级
+            const el = stack.shift()
+
+            // 在结束标签后面 需要更新开始收集的tag的位置信息 以及source内容
+            onCloseTag(el, end)
+          }
         }
       }
 
@@ -283,6 +306,14 @@ function reset() {
 export function baseParse(input: string, options?: ParserOptions): RootNode {
   reset()
   currentInput = input
+
+  const delimiters = options && options.delimiters
+
+  if (delimiters) {
+    tokenizer.delimiterOpen = toCharCodes(delimiters[0])
+    tokenizer.delimiterClose = toCharCodes(delimiters[1])
+  }
+
   const root = (currentRoot = createRoot([], input))
 
   // TODO
