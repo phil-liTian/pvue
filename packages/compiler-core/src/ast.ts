@@ -12,10 +12,13 @@ export enum NodeTypes {
 
   // container
   IF,
+  FOR,
+  COMPOUND_EXPRESSION,
 
   // codegen
   VNODE_CALL,
   JS_CALL_EXPRESSION,
+  JS_ARRAY_EXPRESSION,
 }
 
 export enum ConstantTypes {
@@ -23,6 +26,14 @@ export enum ConstantTypes {
   CAN_SKIP_PATCH,
   CAN_CACHE,
   CAN_STRINGIFY,
+}
+
+// element 类型 细分 比如 <slot /> <template /> <component />
+export enum ElementType {
+  ELEMENT,
+  COMPONENT,
+  SLOT,
+  TEMPLATE,
 }
 
 export const locStub: SourceLocation = {
@@ -58,14 +69,33 @@ export interface InterpolationNode extends Node {
   content: string
 }
 
+export interface CompoundExpressionNode extends Node {
+  type: NodeTypes.COMPOUND_EXPRESSION
+}
+
+export interface SlotOutletNode extends BaseElementNode {
+  tagType: ElementType.SLOT
+  codegenNode: any
+}
+
 export interface VNodeCall extends Node {
   tag: string | symbol
   props: undefined
   children: TemplateChildNode[] | undefined
   patchFlag: PatchFlags | undefined
   dynamicProps: string | undefined
-  directives: undefined
+  directives: undefined | DirectiveNode
   isBlock: boolean
+}
+
+export interface CallExpression extends Node {
+  type: NodeTypes.JS_CALL_EXPRESSION
+  callee: string | symbol
+}
+
+export interface ArrayExpression extends Node {
+  type: NodeTypes.JS_ARRAY_EXPRESSION
+  elements: Array<string | Node>
 }
 
 export type ExpressionNode = SimpleExpressionNode
@@ -149,6 +179,7 @@ export function createSimpleExpression(
   }
 }
 
+// 创建一个vnode element 类型的node
 export function createVNodeCall(
   context: TransformContext | null,
   tag: VNodeCall['tag'],
@@ -171,6 +202,34 @@ export function createVNodeCall(
   }
 }
 
+// 创建一个JS_CALL类型的对象
+export function createCallExpression<T extends CallExpression['callee']>(
+  callee: T
+) {
+  return {
+    type: NodeTypes.JS_CALL_EXPRESSION,
+    callee,
+  }
+}
+
+export function createArrayExpression(elements: ArrayExpression['elements']) {
+  return {
+    type: NodeTypes.JS_ARRAY_EXPRESSION,
+    elements,
+  }
+}
+
+// 创建复合节点 比如 {{ foo }} bar
+export function createCompoundExpression(
+  loc: SourceLocation = locStub
+): CompoundExpressionNode {
+  return {
+    type: NodeTypes.COMPOUND_EXPRESSION,
+    loc,
+  }
+}
+
+// 转化成isBlock
 export function convertToBlock(node: VNodeCall, {}: TransformContext) {
   if (!node.isBlock) {
     node.isBlock = true

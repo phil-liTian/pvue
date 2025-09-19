@@ -5,6 +5,7 @@ import {
   createSimpleExpression,
   DirectiveNode,
   type ElementNode,
+  ElementType,
   NodeTypes,
   RootNode,
   SimpleExpressionNode,
@@ -60,6 +61,12 @@ function lookAhead(index: number, c: number) {
 
 function onCloseTag(el: ElementNode, end: number) {
   setLocEnd(el.loc, lookAhead(end, CharCodes.Gt) + 1)
+
+  const { tag } = el
+  console.log('tag', tag)
+  if (tag === 'slot') {
+    el.tagType = ElementType.SLOT
+  }
 }
 
 function addNode(node: TemplateChildNode) {
@@ -116,7 +123,8 @@ const tokenizer = new Tokenizer(stack, {
       props: [],
       // 记录当前tag的位置
       loc: getLoc(start - 1, endIndex),
-      // tagType: NodeTypes.ELEMENT,
+      // 这个属性在onCloseTag的时候会被重新定义 因为在结束的时候才知道是 slot、template、component还是说就是一个element类型
+      tagType: ElementType.ELEMENT,
     }
   },
 

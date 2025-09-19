@@ -1,3 +1,7 @@
+/*
+ * @Author: phil
+ * @Date: 2025-08-09 10:24:44
+ */
 export enum PatchFlags {
   TEXT = 1,
   CLASS = 1 << 1,
@@ -10,5 +14,7 @@ export enum PatchFlags {
   KEYED_FRAGMENT = 1 << 7,
   // Indicates a fragment with unkeyed children.
   UNKEYED_FRAGMENT = 1 << 8,
+  // 表明 根节点有多个 但是只有一个是有效的 其余的都是注释节点
+  DEV_ROOT_FRAGMENT = 1 << 11,
   BAIL = -2,
 }

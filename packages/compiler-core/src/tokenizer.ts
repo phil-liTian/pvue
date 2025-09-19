@@ -273,7 +273,8 @@ export default class Tokenizer {
 
   // v- 后面的内容
   private stateInDirName(c: number) {
-    if (c === CharCodes.Eq) {
+    // 指令后面有可能是没有等号的<div v-foo/>
+    if (c === CharCodes.Eq || isEndOfTagSection(c)) {
       this.cbs.ondirname(this.sectionStart, this.index)
       this.handleAttrNameEnd(c)
     }
@@ -282,6 +283,11 @@ export default class Tokenizer {
   private stateAfterAttrName(c: number) {
     if (c === CharCodes.Eq) {
       this.state = State.BeforeAttrValue
+    } else if (c === CharCodes.Slash) {
+      // 有可能是没有属性值的 也就是说 属性后面没有'等号' <div v-foo />
+      this.cbs.onattribend(QuoteType.NoValue, this.sectionStart)
+      this.state = State.BeforeAttrName
+      this.stateBeforeAttrName(c)
     }
   }
 

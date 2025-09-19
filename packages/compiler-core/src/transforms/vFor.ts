@@ -5,12 +5,9 @@ import {
   TransformContext,
 } from '../transform'
 
-// 处理v-if、v-else、v-else-if
-export const transformIf: NodeTransform = createStructuralDirectiveTransform(
-  /^(if)$/,
+export const transformFor: NodeTransform = createStructuralDirectiveTransform(
+  'for',
   (node, dir, context) => {
-    console.log('vif')
-
     processIf(node, dir, context)
   }
 )
@@ -20,9 +17,9 @@ export function processIf(
   dir: DirectiveNode,
   context: TransformContext
 ) {
-  if (dir.name === 'if') {
+  if (dir.name === 'for') {
     const ifNode = {
-      type: NodeTypes.IF,
+      type: NodeTypes.FOR,
     }
 
     context.replaceNode(ifNode)

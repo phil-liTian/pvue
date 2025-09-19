@@ -1,7 +1,15 @@
-import { camelize, capitalize, isArray, isString, NOOP } from '@pvue/shared'
+import {
+  camelize,
+  capitalize,
+  isArray,
+  isString,
+  NOOP,
+  PatchFlags,
+} from '@pvue/shared'
 import {
   convertToBlock,
   createSimpleExpression,
+  createVNodeCall,
   DirectiveNode,
   ElementNode,
   JSChildNode,
@@ -13,7 +21,7 @@ import {
 } from './ast'
 import { TransformOptions } from './options'
 import { defaultOnError } from './errors'
-import { CREATE_COMMENT, TO_DISPLAY_STRING } from './runtimeHelpers'
+import { CREATE_COMMENT, FRAGMENT, TO_DISPLAY_STRING } from './runtimeHelpers'
 import { getSingleElementRoot } from './transforms/cacheStatic'
 
 export interface TransformContext extends Required<TransformOptions> {
@@ -193,6 +201,7 @@ function traverseChildren(parent: ParentNode, context: TransformContext) {
 
 function createRootCodegen(root: RootNode, context: TransformContext) {
   const { children } = root
+  const { helper } = context
 
   // 单根节点
   if (children.length === 1) {
@@ -210,6 +219,26 @@ function createRootCodegen(root: RootNode, context: TransformContext) {
     } else {
       root.codegenNode = children[0]
     }
+  } else if (children.length > 1) {
+    let patchFlag = PatchFlags.STABLE_FRAGMENT
+    if (
+      __DEV__ &&
+      children.filter(v => v.type !== NodeTypes.COMMENT).length === 1
+    ) {
+      patchFlag |= PatchFlags.DEV_ROOT_FRAGMENT
+    }
+
+    //  多根节点
+    root.codegenNode = createVNodeCall(
+      context,
+      helper(FRAGMENT),
+      undefined,
+      root.children,
+      patchFlag,
+      undefined,
+      undefined,
+      true
+    )
   } else {
     root.codegenNode = children[0]
   }
