@@ -233,9 +233,55 @@ Component
 
 经典问题总结
 
-1. 自定义渲染器的执行过程？
+1.  自定义渲染器的执行过程？挂载 app 上的方法是如何实现的？
+    在 runtime-dom 中使用 runtime-core 中的 createRenderer 方法导出 createApp 方法。实际指向的是 runtime-core 中的 createAppAPI.在这里将返回一个 app 对象, 在 app 对象上挂载 config、mount、unmount、provide 等方法。实现了一整套自定义渲染器的流程，是 runtime-core 可以在任意平台使用
+    2.1 主要流程
 
-2. 挂载 app 上的方法是如何实现的？
+```js
+// 在runtime-dom中 创建相应的renderOptions
+function ensureRenderer() {
+  return createRenderer(renderOptions)
+}
+
+export const createApp = (...args: any[]) => {
+  const app = ensureRenderer().createApp(...args)
+
+  return app
+}
+
+// 在runtime-core中 导出createRenderer方法, 创建app实例
+
+export function createRenderer<HostNode, HostElement>(
+  options: RenderOptions<HostNode, HostElement>
+) {
+  return baseCreateRenderer(options)
+}
+
+function baseCreateRenderer(options) {
+  // ...
+  return {
+    render,
+    createApp: createAppAPI(render) as any,
+  }
+}
+
+
+// 在createAppAPI中返回app对象。在函数内部处理创建的app对象上的属性，比如use、mount等方法
+
+export function createAppAPI(render): CreateAppFunction {
+  return function createApp(rootComponent, rootProps = null) {
+     const app: App = {}
+    // ...
+
+    // mount方法 将执行render函数 将rootComponet挂载到rootContainer上。 开始执行patch逻辑
+    mount() {
+    }
+
+     return app
+  }
+}
+
+```
 
 3. patch 的执行过程
 
