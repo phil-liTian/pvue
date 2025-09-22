@@ -3,7 +3,7 @@
  * @Date: 2025-09-19 09:42:14
  */
 import {
-  ElementType,
+  ElementTypes,
   InterpolationNode,
   NodeTypes,
   RootNode,
@@ -20,7 +20,7 @@ import {
 export function isSlotOutlet(
   node: RootNode | TemplateChildNode
 ): node is SlotOutletNode {
-  return node.type === NodeTypes.ELEMENT && node.tagType === ElementType.SLOT
+  return node.type === NodeTypes.ELEMENT && node.tagType === ElementTypes.SLOT
 }
 
 /**

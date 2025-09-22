@@ -1,3 +1,7 @@
+/*
+ * @Author: phil
+ * @Date: 2025-09-14 21:12:19
+ */
 import { ElementNode, Namespace } from './ast'
 import { NodeTransform } from './transform'
 
@@ -15,7 +19,14 @@ export interface ErrorHandlingOptions {
 }
 
 export interface ParserOptions extends ErrorHandlingOptions {
+  // 是否是空标签 默认是false
   isVoidTag?: (tag: string) => boolean
+  // 是否是原始标签, 不是nativeTag则认为是component类型
+  isNativeTag?: (tag: string) => boolean
+  // 是否是自定义标签
+  isCustomElement?: (tag: string) => boolean | void
+  // 内置组件
+  isBuiltInComponent?: (tag: string) => symbol | void
   delimiters?: [string, string]
   comments?: boolean
   ns?: Namespace

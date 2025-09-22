@@ -1,9 +1,13 @@
+/*
+ * @Author: phil
+ * @Date: 2025-09-18 13:36:50
+ */
 import {
   createArrayExpression,
   createVNodeCall,
   DirectiveNode,
   ElementNode,
-  ElementType,
+  ElementTypes,
   NodeTypes,
   VNodeCall,
 } from '../ast'
@@ -28,7 +32,9 @@ export const transformElement: NodeTransform = (node, context) => {
     node = context.currentNode
 
     if (
-      !(node.type === NodeTypes.ELEMENT && node.tagType === ElementType.ELEMENT)
+      !(
+        node.type === NodeTypes.ELEMENT && node.tagType === ElementTypes.ELEMENT
+      )
     )
       return
     const { tag, props } = node

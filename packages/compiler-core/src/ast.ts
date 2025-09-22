@@ -9,6 +9,7 @@ export enum NodeTypes {
   INTERPOLATION,
   DIRECTIVE,
   COMMENT,
+  ATTRIBUTE,
 
   // container
   IF,
@@ -29,7 +30,7 @@ export enum ConstantTypes {
 }
 
 // element 类型 细分 比如 <slot /> <template /> <component />
-export enum ElementType {
+export enum ElementTypes {
   ELEMENT,
   COMPONENT,
   SLOT,
@@ -80,7 +81,7 @@ export interface CompoundExpressionNode extends Node {
 }
 
 export interface SlotOutletNode extends BaseElementNode {
-  tagType: ElementType.SLOT
+  tagType: ElementTypes.SLOT
   codegenNode: any
 }
 
@@ -161,6 +162,14 @@ export interface DirectiveNode extends Node {
 
   // id
   arg: ExpressionNode | undefined
+}
+
+export interface AttributeNode extends Node {
+  type: NodeTypes.ATTRIBUTE
+  name: string
+  // pvue:a
+  value: undefined | TextNode
+  nameLoc: SourceLocation
 }
 
 export function createRoot(

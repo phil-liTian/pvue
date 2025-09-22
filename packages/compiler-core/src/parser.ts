@@ -1,11 +1,12 @@
 import { extend, NO } from '@pvue/shared'
 import {
+  AttributeNode,
   ConstantTypes,
   createRoot,
   createSimpleExpression,
   DirectiveNode,
   type ElementNode,
-  ElementType,
+  ElementTypes,
   Namespaces,
   NodeTypes,
   RootNode,
@@ -15,7 +16,12 @@ import {
 } from './ast'
 import { createCompilerError, defaultOnError, ErrorCodes } from './errors'
 import { ParserOptions } from './options'
-import Tokenizer, { CharCodes, isWhitespace, toCharCodes } from './tokenizer'
+import Tokenizer, {
+  CharCodes,
+  isWhitespace,
+  QuoteType,
+  toCharCodes,
+} from './tokenizer'
 
 const stack: ElementNode = []
 let currentInput = ''
@@ -24,7 +30,7 @@ let currentOpenTag: ElementNode | null = null
 // 根节点
 let currentRoot: RootNode | null = null
 // 当前处理的属性 例如<div :id='foo' />
-let currentProp: null | DirectiveNode = null
+let currentProp: null | DirectiveNode | AttributeNode = null
 // 当前属性值 例如 <div :id='foo' /> 中的 foo
 let currentAttrValue = ''
 // 属性开始的位置下标 方便在onattribend中收集属性的位置
@@ -32,12 +38,19 @@ let currentAttrStartIndex = -1
 // 属性结束的位置下标
 let currentAttrEndIndex = -1
 
-export type MergedParserOptions = Required<ParserOptions>
+type OptionalOptions = 'isNativeTag' | 'isBuiltInComponent'
+
+export type MergedParserOptions = Omit<
+  Required<ParserOptions>,
+  OptionalOptions
+> &
+  Pick<ParserOptions, OptionalOptions>
 
 export const defaultParserOptions: MergedParserOptions = {
   onError: defaultOnError,
   isVoidTag: NO,
   getNamespace: () => Namespaces.HTML,
+  isCustomElement: NO,
   ns: Namespaces.HTML,
   delimiters: ['{{', '}}'],
   comments: __DEV__,
@@ -63,13 +76,71 @@ function lookAhead(index: number, c: number) {
   return i
 }
 
+function isUpperCase(c: number) {
+  return c >= 65 && c <= 90
+}
+
+/**
+ * 检查节点是否为Fragment模板
+ * @param node - 元素节点
+ * @returns 是否为Fragment模板
+ */
+function isFragmentTemplate({ tag, props }: ElementNode): boolean {
+  if (tag === 'template') {
+    for (let i = 0; i < props.length; i++) {
+      if (props[i].type === NodeTypes.DIRECTIVE) {
+        return true
+      }
+    }
+  }
+
+  return false
+}
+
+function isComponent({ tag, props }: ElementNode): boolean {
+  // 指定tag是自定义标签的话 则不做component处理
+  if (currentOptions.isCustomElement(tag)) {
+    return false
+  }
+
+  // tag是component或者首字母大写或者isBuiltInComponent指定为true、isNativeTag指定为false的tag都认为是组件类型
+  if (
+    tag === 'component' ||
+    isUpperCase(tag.charCodeAt(0)) ||
+    (currentOptions.isBuiltInComponent &&
+      currentOptions.isBuiltInComponent(tag)) ||
+    (currentOptions.isNativeTag && !currentOptions.isNativeTag(tag))
+  ) {
+    return true
+  }
+
+  // 属性中存在<div is='pvue:a' /> 这种标签也会被当作component处理
+  for (let i = 0; i < props.length; i++) {
+    const p = props[i]
+    if (p.type === NodeTypes.ATTRIBUTE) {
+      // 属性中存在<div is='pvue:a' /> 这种标签也会被当作component处理
+      if (p.name === 'is' && p.value) {
+        if (p.value.content.startsWith('pvue:')) {
+          return true
+        }
+      }
+    }
+  }
+
+  return false
+}
+
 function onCloseTag(el: ElementNode, end: number) {
   setLocEnd(el.loc, lookAhead(end, CharCodes.Gt) + 1)
 
-  const { tag } = el
+  const { tag, props } = el
 
   if (tag === 'slot') {
-    el.tagType = ElementType.SLOT
+    el.tagType = ElementTypes.SLOT
+  } else if (isFragmentTemplate(el)) {
+    el.tagType = ElementTypes.TEMPLATE
+  } else if (isComponent(el)) {
+    el.tagType = ElementTypes.COMPONENT
   }
 }
 
@@ -79,12 +150,17 @@ function addNode(node: TemplateChildNode) {
 
 function endOpenTag(end: number) {
   addNode(currentOpenTag)
+  const { tag } = currentOpenTag
 
-  // 关闭标签的时候 需要更新currentOpenTag的loc信息，结束位置以及source
-  onCloseTag(currentOpenTag, end)
+  // 是否是有效的tag 默认是false, 有效标签 不被收集到stack中 不需要闭合逻辑
+  if (currentOptions.isVoidTag(tag)) {
+    // 关闭标签的时候 需要更新currentOpenTag的loc信息，结束位置以及source
+    onCloseTag(currentOpenTag, end)
+  } else {
+    // 将当前tag  推入栈顶, 为了方便比较后面结束标签是否跟开始相同, 不同则是无效tag
+    stack.unshift(currentOpenTag)
+  }
 
-  // 将当前tag  推入栈顶, 为了方便比较后面结束标签是否跟开始相同, 不同则是无效tag
-  stack.unshift(currentOpenTag)
   currentOpenTag = null
 }
 
@@ -137,7 +213,7 @@ const tokenizer = new Tokenizer(stack, {
       // 记录当前tag的位置
       loc: getLoc(start - 1, endIndex),
       // 这个属性在onCloseTag的时候会被重新定义 因为在结束的时候才知道是 slot、template、component还是说就是一个element类型
-      tagType: ElementType.ELEMENT,
+      tagType: ElementTypes.ELEMENT,
       codegenNode: undefined,
       ns: currentOptions.getNamespace(name, stack[0], currentOptions.ns),
     }
@@ -155,8 +231,6 @@ const tokenizer = new Tokenizer(stack, {
       // 拿栈顶元素进行比较 tag相同则认为标签是匹配的
       for (let i = 0; i < stack.length; i++) {
         const e = stack[i]
-
-        console.log('i', i)
 
         if (e.tag.toLowerCase() === name.toLowerCase()) {
           found = true
@@ -182,10 +256,13 @@ const tokenizer = new Tokenizer(stack, {
   // 处理自闭合标签, 如果栈顶元素与当前自闭合标签相同, 其实这种情况下是必然相同的, 则将栈顶元素弹出,方便处理后续进入的openTag
   onselfclosingtag(endIndex) {
     const name = currentOpenTag.tag
+    // 标识是自闭合标签
+    currentOpenTag.isSelfClosing = true
 
     endOpenTag(endIndex)
     if (stack[0] && stack[0]?.tag === name) {
-      stack.shift()
+      // 设置自闭合标签的结束位置
+      onCloseTag(stack.shift(), endIndex)
     }
   },
 
@@ -224,17 +301,42 @@ const tokenizer = new Tokenizer(stack, {
     currentAttrEndIndex = endIndex
   },
 
+  // 属性属性名 <div is='vue:a' />
+  onattribname(start, endIndex) {
+    currentProp = {
+      type: NodeTypes.ATTRIBUTE,
+      name: getSlice(start, endIndex),
+      value: undefined,
+      loc: getLoc(start, endIndex),
+      nameLoc: getLoc(start, endIndex),
+    }
+  },
+
   // 将当前属性push到currentOpenTag中
   onattribend(quote, endIndex) {
     if (currentProp && currentOpenTag) {
       setLocEnd(currentProp.loc, endIndex)
-
-      currentProp.exp = createExp(
-        currentAttrValue,
-        false,
-        getLoc(currentAttrStartIndex, currentAttrEndIndex),
-        ConstantTypes.NOT_CONSTANT
-      )
+      // 如果说没有引号 则说明 属性没有value值，如果是指令的话，则说明没有exp表达式的内容
+      if (quote !== QuoteType.NoValue) {
+        if (currentProp.type === NodeTypes.ATTRIBUTE) {
+          currentProp.value = {
+            type: NodeTypes.TEXT,
+            content: currentAttrValue,
+            // 如果是没有被引号包起来的属性，source应该就是当前属性的下标
+            loc:
+              QuoteType.Unquoted === quote
+                ? getLoc(currentAttrStartIndex, currentAttrEndIndex)
+                : getLoc(currentAttrStartIndex - 1, currentAttrEndIndex + 1),
+          }
+        } else {
+          currentProp.exp = createExp(
+            currentAttrValue,
+            false,
+            getLoc(currentAttrStartIndex, currentAttrEndIndex),
+            ConstantTypes.NOT_CONSTANT
+          )
+        }
+      }
 
       currentOpenTag.props.push(currentProp)
     }
@@ -306,6 +408,8 @@ function reset() {
 export function baseParse(input: string, options?: ParserOptions): RootNode {
   reset()
   currentInput = input
+  // 重置下currentOptions为defaultParserOptions 缓存内容
+  currentOptions = extend({}, defaultParserOptions)
 
   const delimiters = options && options.delimiters
 
@@ -318,6 +422,7 @@ export function baseParse(input: string, options?: ParserOptions): RootNode {
 
   // TODO
   extend(currentOptions, options)
+  // currentOptions = extend({}, defaultParserOptions)
 
   tokenizer.parse(input)
 

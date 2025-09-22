@@ -25,11 +25,14 @@ export enum State {
 
   // attrs
   BeforeAttrName,
+  InAttrName, // 处理属性名 比如 <div is='pvue:a' />
   InDirArg, // 例如处理 :后面的属性
   InDirName, // 例如 v- 后面的name
   AfterAttrName,
   BeforeAttrValue,
   InAttrValueDq,
+  InAttrValueSq,
+  InAttrValueNq,
 
   // 注释
   BeforeDeclaration,
@@ -100,6 +103,7 @@ export interface Callbacks {
   ondirarg(start: number, endIndex: number): void
   onattribnameend(endIndex: number): void
 
+  onattribname(start: number, endIndex: number): void
   onattribdata(start: number, endIndex: number): void
   onattribend(quote: QuoteType, endIndex: number): void
 
@@ -280,11 +284,22 @@ export default class Tokenizer {
     }
   }
 
+  // 处理属性名
+  private stateInAttrName(c: number) {
+    if (c === CharCodes.Eq || isEndOfTagSection(c)) {
+      // 处理属性名
+      this.cbs.onattribname(this.sectionStart, this.index)
+      // 处理属性值
+      this.handleAttrNameEnd(c)
+    }
+  }
+
   private stateAfterAttrName(c: number) {
     if (c === CharCodes.Eq) {
       this.state = State.BeforeAttrValue
-    } else if (c === CharCodes.Slash) {
+    } else if (c === CharCodes.Slash || c === CharCodes.Gt) {
       // 有可能是没有属性值的 也就是说 属性后面没有'等号' <div v-foo />
+      // 或者是开始标签中 属性没有属性值 <div id></div>
       this.cbs.onattribend(QuoteType.NoValue, this.sectionStart)
       this.state = State.BeforeAttrName
       this.stateBeforeAttrName(c)
@@ -295,12 +310,34 @@ export default class Tokenizer {
     if (c === CharCodes.DoubleQuote) {
       this.state = State.InAttrValueDq
       this.sectionStart = this.index + 1
+    } else if (c === CharCodes.SingleQuote) {
+      this.state = State.InAttrValueSq
+      this.sectionStart = this.index + 1
+    } else {
+      this.state = State.InAttrValueNq
+      this.sectionStart = this.index
+      this.stateInAttrValueNoQuotes(c)
     }
   }
 
   // 处理双引号里面的内容
   private stateInAttrValueDoubleQuotes(c: number) {
     this.handleInAttrValue(c, CharCodes.DoubleQuote)
+  }
+
+  private stateInAttrValueSingleQuotes(c: number) {
+    this.handleInAttrValue(c, CharCodes.SingleQuote)
+  }
+
+  private stateInAttrValueNoQuotes(c: number) {
+    if (c === CharCodes.Gt) {
+      this.cbs.onattribdata(this.sectionStart, this.index)
+
+      this.cbs.onattribend(QuoteType.Unquoted, this.index)
+      this.sectionStart = this.index
+      this.state = State.BeforeAttrName
+      this.stateBeforeAttrName(c)
+    }
   }
 
   public currentSequence: Uint8Array = undefined!
@@ -352,6 +389,9 @@ export default class Tokenizer {
       this.cbs.ondirname(this.index, this.index + 1)
       this.state = State.InDirArg
       this.sectionStart = this.index + 1
+    } else {
+      this.state = State.InAttrName
+      this.sectionStart = this.index
     }
   }
 
@@ -377,7 +417,7 @@ export default class Tokenizer {
 
       this.cbs.onattribend(
         c === CharCodes.DoubleQuote ? QuoteType.Double : QuoteType.Single,
-        this.index
+        this.index + 1
       )
       this.state = State.BeforeAttrName
     }
@@ -446,9 +486,14 @@ export default class Tokenizer {
           break
         }
 
-        // 处理属性名
+        // 处理指令名
         case State.InDirName: {
           this.stateInDirName(c)
+          break
+        }
+
+        case State.InAttrName: {
+          this.stateInAttrName(c)
           break
         }
 
@@ -460,6 +505,16 @@ export default class Tokenizer {
 
         case State.InAttrValueDq: {
           this.stateInAttrValueDoubleQuotes(c)
+          break
+        }
+
+        case State.InAttrValueSq: {
+          this.stateInAttrValueSingleQuotes(c)
+          break
+        }
+
+        case State.InAttrValueNq: {
+          this.stateInAttrValueNoQuotes(c)
           break
         }
 

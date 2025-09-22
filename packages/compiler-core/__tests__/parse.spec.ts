@@ -2,7 +2,7 @@ import {
   CommentNode,
   ConstantTypes,
   ElementNode,
-  ElementType,
+  ElementTypes,
   InterpolationNode,
   Namespaces,
   NodeTypes,
@@ -441,7 +441,7 @@ describe('compiler: parse', () => {
         type: NodeTypes.ELEMENT,
         ns: Namespaces.HTML,
         tag: 'div',
-        tagType: ElementType.ELEMENT,
+        tagType: ElementTypes.ELEMENT,
         codegenNode: undefined,
         props: [],
         children: [
@@ -459,6 +459,519 @@ describe('compiler: parse', () => {
           start: { offset: 0, line: 1, column: 1 },
           end: { offset: 16, line: 1, column: 17 },
           source: '<div>hello</div>',
+        },
+      })
+    })
+
+    test('empty', () => {
+      const ast = baseParse('<div></div>')
+      const element = ast.children[0] as ElementNode
+
+      expect(element).toStrictEqual({
+        type: NodeTypes.ELEMENT,
+        ns: Namespaces.HTML,
+        tag: 'div',
+        tagType: ElementTypes.ELEMENT,
+        codegenNode: undefined,
+        props: [],
+        children: [],
+        loc: {
+          start: { offset: 0, line: 1, column: 1 },
+          end: { offset: 11, line: 1, column: 12 },
+          source: '<div></div>',
+        },
+      })
+    })
+
+    test('self closing', () => {
+      const ast = baseParse('<div/>after')
+      const element = ast.children[0] as ElementNode
+
+      expect(element).toStrictEqual({
+        type: NodeTypes.ELEMENT,
+        ns: Namespaces.HTML,
+        tag: 'div',
+        tagType: ElementTypes.ELEMENT,
+        codegenNode: undefined,
+        props: [],
+        children: [],
+        isSelfClosing: true,
+        loc: {
+          start: { offset: 0, line: 1, column: 1 },
+          end: { offset: 6, line: 1, column: 7 },
+          source: '<div/>',
+        },
+      })
+    })
+
+    test('void element', () => {
+      const ast = baseParse('<img>after', {
+        isVoidTag: tag => tag === 'img',
+      })
+      const element = ast.children[0] as ElementNode
+
+      expect(element).toStrictEqual({
+        type: NodeTypes.ELEMENT,
+        ns: Namespaces.HTML,
+        tag: 'img',
+        tagType: ElementTypes.ELEMENT,
+        codegenNode: undefined,
+        props: [],
+        children: [],
+        loc: {
+          start: { offset: 0, line: 1, column: 1 },
+          end: { offset: 5, line: 1, column: 6 },
+          source: '<img>',
+        },
+      })
+    })
+
+    test('self-closing void element', () => {
+      const ast = baseParse('<img/>after', {
+        isVoidTag: tag => tag === 'img',
+      })
+      const element = ast.children[0] as ElementNode
+
+      expect(element).toStrictEqual({
+        type: NodeTypes.ELEMENT,
+        ns: Namespaces.HTML,
+        tag: 'img',
+        tagType: ElementTypes.ELEMENT,
+        codegenNode: undefined,
+        props: [],
+        children: [],
+        isSelfClosing: true,
+        loc: {
+          start: { offset: 0, line: 1, column: 1 },
+          end: { offset: 6, line: 1, column: 7 },
+          source: '<img/>',
+        },
+      })
+    })
+
+    test('template element with directives', () => {
+      const ast = baseParse('<template v-if="ok"></template>')
+      const element = ast.children[0]
+      expect(element).toMatchObject({
+        type: NodeTypes.ELEMENT,
+        tagType: ElementTypes.TEMPLATE,
+      })
+    })
+
+    test('template element without directives', () => {
+      const ast = baseParse('<template></template>')
+      const element = ast.children[0]
+      expect(element).toMatchObject({
+        type: NodeTypes.ELEMENT,
+        tagType: ElementTypes.ELEMENT,
+      })
+    })
+
+    test('native element with `isNativeTag`', () => {
+      const ast = baseParse('<div></div><comp></comp><Comp></Comp>', {
+        isNativeTag: tag => tag === 'div',
+      })
+
+      expect(ast.children[0]).toMatchObject({
+        type: NodeTypes.ELEMENT,
+        tag: 'div',
+        tagType: ElementTypes.ELEMENT,
+      })
+
+      expect(ast.children[1]).toMatchObject({
+        type: NodeTypes.ELEMENT,
+        tag: 'comp',
+        tagType: ElementTypes.COMPONENT,
+      })
+
+      expect(ast.children[2]).toMatchObject({
+        type: NodeTypes.ELEMENT,
+        tag: 'Comp',
+        tagType: ElementTypes.COMPONENT,
+      })
+    })
+
+    test('native element without `isNativeTag`', () => {
+      const ast = baseParse('<div></div><comp></comp><Comp></Comp>')
+
+      expect(ast.children[0]).toMatchObject({
+        type: NodeTypes.ELEMENT,
+        tag: 'div',
+        tagType: ElementTypes.ELEMENT,
+      })
+
+      expect(ast.children[1]).toMatchObject({
+        type: NodeTypes.ELEMENT,
+        tag: 'comp',
+        tagType: ElementTypes.ELEMENT,
+      })
+
+      expect(ast.children[2]).toMatchObject({
+        type: NodeTypes.ELEMENT,
+        tag: 'Comp',
+        tagType: ElementTypes.COMPONENT,
+      })
+    })
+
+    test('is casting with `isNativeTag`', () => {
+      const ast = baseParse(
+        `<div></div><div is="pvue:foo"></div><Comp></Comp>`,
+        {
+          isNativeTag: tag => tag === 'div',
+        }
+      )
+
+      expect(ast.children[0]).toMatchObject({
+        type: NodeTypes.ELEMENT,
+        tag: 'div',
+        tagType: ElementTypes.ELEMENT,
+      })
+
+      expect(ast.children[1]).toMatchObject({
+        type: NodeTypes.ELEMENT,
+        tag: 'div',
+        tagType: ElementTypes.COMPONENT,
+      })
+
+      expect(ast.children[2]).toMatchObject({
+        type: NodeTypes.ELEMENT,
+        tag: 'Comp',
+        tagType: ElementTypes.COMPONENT,
+      })
+    })
+
+    test('is casting without `isNativeTag`', () => {
+      const ast = baseParse(`<div></div><div is="pvue:foo"></div><Comp></Comp>`)
+
+      expect(ast.children[0]).toMatchObject({
+        type: NodeTypes.ELEMENT,
+        tag: 'div',
+        tagType: ElementTypes.ELEMENT,
+      })
+
+      expect(ast.children[1]).toMatchObject({
+        type: NodeTypes.ELEMENT,
+        tag: 'div',
+        tagType: ElementTypes.COMPONENT,
+      })
+
+      expect(ast.children[2]).toMatchObject({
+        type: NodeTypes.ELEMENT,
+        tag: 'Comp',
+        tagType: ElementTypes.COMPONENT,
+      })
+    })
+
+    test('custom element', () => {
+      const ast = baseParse('<div></div><comp></comp>', {
+        isNativeTag: tag => tag === 'div',
+        isCustomElement: tag => tag === 'comp',
+      })
+
+      expect(ast.children[0]).toMatchObject({
+        type: NodeTypes.ELEMENT,
+        tag: 'div',
+        tagType: ElementTypes.ELEMENT,
+      })
+
+      expect(ast.children[1]).toMatchObject({
+        type: NodeTypes.ELEMENT,
+        tag: 'comp',
+        tagType: ElementTypes.ELEMENT,
+      })
+    })
+
+    test('built-in component', () => {
+      const ast = baseParse('<div></div><comp></comp>', {
+        isBuiltInComponent: tag => (tag === 'comp' ? Symbol() : void 0),
+      })
+
+      expect(ast.children[0]).toMatchObject({
+        type: NodeTypes.ELEMENT,
+        tag: 'div',
+        tagType: ElementTypes.ELEMENT,
+      })
+
+      expect(ast.children[1]).toMatchObject({
+        type: NodeTypes.ELEMENT,
+        tag: 'comp',
+        tagType: ElementTypes.COMPONENT,
+      })
+    })
+
+    test('slot element', () => {
+      const ast = baseParse('<slot></slot><Comp></Comp>')
+
+      expect(ast.children[0]).toMatchObject({
+        type: NodeTypes.ELEMENT,
+        tag: 'slot',
+        tagType: ElementTypes.SLOT,
+      })
+
+      expect(ast.children[1]).toMatchObject({
+        type: NodeTypes.ELEMENT,
+        tag: 'Comp',
+        tagType: ElementTypes.COMPONENT,
+      })
+    })
+
+    test('attribute with no value', () => {
+      const ast = baseParse('<div id></div>')
+      const element = ast.children[0] as ElementNode
+
+      expect(element).toStrictEqual({
+        type: NodeTypes.ELEMENT,
+        ns: Namespaces.HTML,
+        tag: 'div',
+        tagType: ElementTypes.ELEMENT,
+        codegenNode: undefined,
+        props: [
+          {
+            type: NodeTypes.ATTRIBUTE,
+            name: 'id',
+            nameLoc: {
+              start: { offset: 5, line: 1, column: 6 },
+              end: { offset: 7, line: 1, column: 8 },
+              source: 'id',
+            },
+            value: undefined,
+            loc: {
+              start: { offset: 5, line: 1, column: 6 },
+              end: { offset: 7, line: 1, column: 8 },
+              source: 'id',
+            },
+          },
+        ],
+        children: [],
+        loc: {
+          start: { offset: 0, line: 1, column: 1 },
+          end: { offset: 14, line: 1, column: 15 },
+          source: '<div id></div>',
+        },
+      })
+    })
+
+    test('attribute with empty value, double quote', () => {
+      const ast = baseParse('<div id=""></div>')
+      const element = ast.children[0] as ElementNode
+
+      expect(element).toStrictEqual({
+        type: NodeTypes.ELEMENT,
+        ns: Namespaces.HTML,
+        tag: 'div',
+        tagType: ElementTypes.ELEMENT,
+        codegenNode: undefined,
+        props: [
+          {
+            type: NodeTypes.ATTRIBUTE,
+            name: 'id',
+            nameLoc: {
+              start: { offset: 5, line: 1, column: 6 },
+              end: { offset: 7, line: 1, column: 8 },
+              source: 'id',
+            },
+            value: {
+              type: NodeTypes.TEXT,
+              content: '',
+              loc: {
+                start: { offset: 8, line: 1, column: 9 },
+                end: { offset: 10, line: 1, column: 11 },
+                source: '""',
+              },
+            },
+            loc: {
+              start: { offset: 5, line: 1, column: 6 },
+              end: { offset: 10, line: 1, column: 11 },
+              source: 'id=""',
+            },
+          },
+        ],
+
+        children: [],
+        loc: {
+          start: { offset: 0, line: 1, column: 1 },
+          end: { offset: 17, line: 1, column: 18 },
+          source: '<div id=""></div>',
+        },
+      })
+    })
+
+    test('attribute with empty value, single quote', () => {
+      const ast = baseParse("<div id=''></div>")
+      const element = ast.children[0] as ElementNode
+
+      expect(element).toStrictEqual({
+        type: NodeTypes.ELEMENT,
+        ns: Namespaces.HTML,
+        tag: 'div',
+        tagType: ElementTypes.ELEMENT,
+        codegenNode: undefined,
+        props: [
+          {
+            type: NodeTypes.ATTRIBUTE,
+            name: 'id',
+            nameLoc: {
+              start: { offset: 5, line: 1, column: 6 },
+              end: { offset: 7, line: 1, column: 8 },
+              source: 'id',
+            },
+            value: {
+              type: NodeTypes.TEXT,
+              content: '',
+              loc: {
+                start: { offset: 8, line: 1, column: 9 },
+                end: { offset: 10, line: 1, column: 11 },
+                source: "''",
+              },
+            },
+            loc: {
+              start: { offset: 5, line: 1, column: 6 },
+              end: { offset: 10, line: 1, column: 11 },
+              source: "id=''",
+            },
+          },
+        ],
+
+        children: [],
+        loc: {
+          start: { offset: 0, line: 1, column: 1 },
+          end: { offset: 17, line: 1, column: 18 },
+          source: "<div id=''></div>",
+        },
+      })
+    })
+
+    test('attribute with value, double quote', () => {
+      const ast = baseParse('<div id=">\'"></div>')
+      const element = ast.children[0] as ElementNode
+
+      expect(element).toStrictEqual({
+        type: NodeTypes.ELEMENT,
+        ns: Namespaces.HTML,
+        tag: 'div',
+        tagType: ElementTypes.ELEMENT,
+        codegenNode: undefined,
+        props: [
+          {
+            type: NodeTypes.ATTRIBUTE,
+            name: 'id',
+            nameLoc: {
+              start: { offset: 5, line: 1, column: 6 },
+              end: { offset: 7, line: 1, column: 8 },
+              source: 'id',
+            },
+            value: {
+              type: NodeTypes.TEXT,
+              content: ">'",
+              loc: {
+                start: { offset: 8, line: 1, column: 9 },
+                end: { offset: 12, line: 1, column: 13 },
+                source: '">\'"',
+              },
+            },
+            loc: {
+              start: { offset: 5, line: 1, column: 6 },
+              end: { offset: 12, line: 1, column: 13 },
+              source: 'id=">\'"',
+            },
+          },
+        ],
+
+        children: [],
+        loc: {
+          start: { offset: 0, line: 1, column: 1 },
+          end: { offset: 19, line: 1, column: 20 },
+          source: '<div id=">\'"></div>',
+        },
+      })
+    })
+
+    test('attribute with value, single quote', () => {
+      const ast = baseParse("<div id='>\"'></div>")
+      const element = ast.children[0] as ElementNode
+
+      expect(element).toStrictEqual({
+        type: NodeTypes.ELEMENT,
+        ns: Namespaces.HTML,
+        tag: 'div',
+        tagType: ElementTypes.ELEMENT,
+        codegenNode: undefined,
+        props: [
+          {
+            type: NodeTypes.ATTRIBUTE,
+            name: 'id',
+            nameLoc: {
+              start: { offset: 5, line: 1, column: 6 },
+              end: { offset: 7, line: 1, column: 8 },
+              source: 'id',
+            },
+            value: {
+              type: NodeTypes.TEXT,
+              content: '>"',
+              loc: {
+                start: { offset: 8, line: 1, column: 9 },
+                end: { offset: 12, line: 1, column: 13 },
+                source: "'>\"'",
+              },
+            },
+            loc: {
+              start: { offset: 5, line: 1, column: 6 },
+              end: { offset: 12, line: 1, column: 13 },
+              source: "id='>\"'",
+            },
+          },
+        ],
+
+        children: [],
+        loc: {
+          start: { offset: 0, line: 1, column: 1 },
+          end: { offset: 19, line: 1, column: 20 },
+          source: "<div id='>\"'></div>",
+        },
+      })
+    })
+
+    test('attribute with value, unquoted', () => {
+      const ast = baseParse('<div id=a/></div>')
+      const element = ast.children[0] as ElementNode
+
+      expect(element).toStrictEqual({
+        type: NodeTypes.ELEMENT,
+        ns: Namespaces.HTML,
+        tag: 'div',
+        tagType: ElementTypes.ELEMENT,
+        codegenNode: undefined,
+        props: [
+          {
+            type: NodeTypes.ATTRIBUTE,
+            name: 'id',
+            nameLoc: {
+              start: { offset: 5, line: 1, column: 6 },
+              end: { offset: 7, line: 1, column: 8 },
+              source: 'id',
+            },
+            value: {
+              type: NodeTypes.TEXT,
+              content: 'a/',
+              loc: {
+                start: { offset: 8, line: 1, column: 9 },
+                end: { offset: 10, line: 1, column: 11 },
+                source: 'a/',
+              },
+            },
+            loc: {
+              start: { offset: 5, line: 1, column: 6 },
+              end: { offset: 10, line: 1, column: 11 },
+              source: 'id=a/',
+            },
+          },
+        ],
+
+        children: [],
+        loc: {
+          start: { offset: 0, line: 1, column: 1 },
+          end: { offset: 17, line: 1, column: 18 },
+          source: '<div id=a/></div>',
         },
       })
     })
