@@ -7,6 +7,7 @@ import {
   DirectiveNode,
   type ElementNode,
   ElementTypes,
+  ForParseResult,
   Namespaces,
   NodeTypes,
   RootNode,
@@ -22,6 +23,7 @@ import Tokenizer, {
   QuoteType,
   toCharCodes,
 } from './tokenizer'
+import { forAliasRE } from './utils'
 
 const stack: ElementNode = []
 let currentInput = ''
@@ -162,6 +164,78 @@ function endOpenTag(end: number) {
   }
 
   currentOpenTag = null
+}
+
+// 去掉两边的括号 比如：<span v-for="(item) in items" />
+const stripParensRE = /^\(|\)$/g
+// 捕获 “第一个逗号后，到下一个限制字符（,}]`）或结束前” 的所有字符（可以是空）
+// 非捕获组（?: 表示不保存该组内容），仅用于分组逻辑，不占用捕获组编号
+const forIteratorRE = /,([^,\}\]]*)(?:,([^,\}\]]*))?$/
+
+// 处理for表达式
+function parseForExpression(input: SimpleExpressionNode) {
+  const exp = input.content
+  const loc = input.loc
+  const inMatch = exp.match(forAliasRE)
+  if (!inMatch) return
+  // LHS是 in或者of之前的内容 RHS是 in或者of之后的内容
+  const [, LHS, RHS] = inMatch
+
+  const createAliasExpression = (content: string, offset: number) => {
+    const start = loc.start.offset + offset
+    const end = content.length + start
+
+    return createExp(
+      content,
+      false,
+      getLoc(start, end),
+      ConstantTypes.NOT_CONSTANT
+    )
+  }
+
+  const result: ForParseResult = {
+    source: createAliasExpression(RHS.trim(), exp.indexOf(RHS, LHS.length)),
+    value: undefined,
+    index: undefined,
+    key: undefined,
+  }
+
+  // 去掉两边的空格 或者 () 两边的空格
+  let valueContent = LHS.trim().replace(stripParensRE, '').trim()
+  const trimmedOffset = LHS.indexOf(valueContent)
+
+  const iteratorMatch = valueContent.match(forIteratorRE)
+
+  if (iteratorMatch) {
+    valueContent = valueContent.replace(forIteratorRE, '').trim()
+    const keyContent = iteratorMatch[1].trim()
+    let keyOffset: number | undefined
+    if (keyContent) {
+      keyOffset = exp.indexOf(keyContent, trimmedOffset + valueContent.length)
+      result.key = createAliasExpression(keyContent, keyOffset)
+    }
+
+    if (iteratorMatch[2]) {
+      const indexContent = iteratorMatch[2].trim()
+      if (indexContent) {
+        result.index = createAliasExpression(
+          indexContent,
+          exp.indexOf(
+            indexContent,
+            result.key
+              ? keyOffset! + keyContent.length
+              : trimmedOffset + valueContent.length
+          )
+        )
+      }
+    }
+  }
+
+  if (valueContent) {
+    result.value = createAliasExpression(valueContent, trimmedOffset)
+  }
+
+  return result
 }
 
 function createExp(
@@ -335,6 +409,11 @@ const tokenizer = new Tokenizer(stack, {
             getLoc(currentAttrStartIndex, currentAttrEndIndex),
             ConstantTypes.NOT_CONSTANT
           )
+
+          if (currentProp.name === 'for') {
+            // 如果是v-for则处理v-for的处理结果
+            currentProp.forParseResult = parseForExpression(currentProp.exp)
+          }
         }
       }
 

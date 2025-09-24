@@ -9,6 +9,7 @@ export default defineConfig({
     __DEV__: true,
     __FEATURE_OPTIONS_API__: true,
     __COMPAT__: true,
+    __BROWSER__: false,
   },
   test: {
     globals: true,

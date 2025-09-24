@@ -54,6 +54,7 @@ export function createTransformContext(
     nodeTransforms = [],
     filename = '',
     onError = defaultOnError,
+    prefixIdentifiers = false,
   }: TransformOptions
 ): TransformContext {
   const nameMatch = filename.replace(/\?.*$/, '').match(/([^/\\]+)\.\w+$/)
@@ -69,6 +70,7 @@ export function createTransformContext(
     childIndex: 0,
     hoists: [],
     helpers: new Map(),
+    prefixIdentifiers,
     onError,
 
     onNodeRemoved: NOOP,
@@ -265,15 +267,20 @@ export function createStructuralDirectiveTransform(
   fn: StructuralDirectiveTransform
 ): NodeTransform {
   const matches = isString(name) ? n => n === name : n => name.test(n)
+
   return (node, context) => {
     if (node.type === NodeTypes.ELEMENT) {
       const { props } = node
+      const exitFns: any = []
       for (let i = 0; i < props.length; i++) {
         const prop = props[i]
         if (matches(prop.name)) {
-          fn(node, prop, context)
+          const onExit = fn(node, prop, context)
+          onExit && exitFns.push(onExit)
         }
       }
+
+      return exitFns
     }
   }
 }

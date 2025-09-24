@@ -46,4 +46,9 @@ export interface TransformOptions
     ErrorHandlingOptions {
   // 对ast进行转换的transform集合
   nodeTransforms?: NodeTransform[]
+
+  // 是否自动补齐前缀
+  prefixIdentifiers?: boolean
 }
+
+export interface CompilerOptions {}

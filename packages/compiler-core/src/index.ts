@@ -1,3 +1,7 @@
+/*
+ * @Author: phil
+ * @Date: 2025-09-12 12:53:24
+ */
 export { baseParse } from './parser'
 
 export type { Node, Position, SourceLocation, RootNode, TextNode } from './ast'
@@ -17,4 +21,6 @@ export { baseCompile } from './compile'
 
 export { transform } from './transform'
 
-export type { CodegenOptions } from './options'
+export type { CodegenOptions, CompilerOptions } from './options'
+
+export { ErrorCodes } from './errors'

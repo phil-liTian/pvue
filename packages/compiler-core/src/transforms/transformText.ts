@@ -22,7 +22,10 @@ export const transformText: NodeTransform = (node, context) => {
             const next = children[j]
             if (isText(next)) {
               if (!currentContainer) {
-                currentContainer = children[i] = createCompoundExpression()
+                currentContainer = children[i] = createCompoundExpression(
+                  [],
+                  child.loc
+                )
               }
               children.splice(j, 1)
               j--

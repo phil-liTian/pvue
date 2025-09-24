@@ -78,11 +78,16 @@ export interface InterpolationNode extends Node {
 
 export interface CompoundExpressionNode extends Node {
   type: NodeTypes.COMPOUND_EXPRESSION
+  children: SimpleExpressionNode[]
 }
 
 export interface SlotOutletNode extends BaseElementNode {
   tagType: ElementTypes.SLOT
   codegenNode: any
+}
+
+export interface TemplateNode extends BaseElementNode {
+  tagType: ElementTypes.TEMPLATE
 }
 
 export interface VNodeCall extends Node {
@@ -94,6 +99,8 @@ export interface VNodeCall extends Node {
   directives: undefined | DirectiveNode
   isBlock: boolean
 }
+
+export interface ForCodegenNode extends VNodeCall {}
 
 export interface CallExpression extends Node {
   type: NodeTypes.JS_CALL_EXPRESSION
@@ -128,6 +135,14 @@ export interface TextNode extends Node {
   type: NodeTypes.TEXT
 }
 
+export interface ForNode extends Node {
+  type: NodeTypes.FOR
+  keyAlias: undefined | ExpressionNode
+  objectIndexAlias: undefined | ExpressionNode
+  valueAlias: undefined | ExpressionNode
+  source: ExpressionNode
+}
+
 export interface CommentNode extends Node {
   type: NodeTypes.COMMENT
 }
@@ -139,6 +154,14 @@ export interface ELementNode extends Node {
 export interface BaseElementNode extends Node {
   type: NodeTypes.ELEMENT
   tag: string
+  children: TemplateChildNode[]
+}
+
+export interface ForParseResult {
+  source: ExpressionNode
+  value: ExpressionNode | undefined
+  key: ExpressionNode | undefined
+  index: ExpressionNode | undefined
 }
 
 export interface SimpleExpressionNode extends Node {
@@ -146,6 +169,8 @@ export interface SimpleExpressionNode extends Node {
   content: string
   isStatic: boolean
   constType: ConstantTypes
+
+  ast?: null | false
 }
 
 // <div :id='foo' />
@@ -162,6 +187,9 @@ export interface DirectiveNode extends Node {
 
   // id
   arg: ExpressionNode | undefined
+
+  // 处理for指令后面的解析结果
+  forParseResult?: ForParseResult
 }
 
 export interface AttributeNode extends Node {
@@ -243,11 +271,13 @@ export function createArrayExpression(elements: ArrayExpression['elements']) {
 
 // 创建复合节点 比如 {{ foo }} bar
 export function createCompoundExpression(
+  children: CompoundExpressionNode['children'],
   loc: SourceLocation = locStub
 ): CompoundExpressionNode {
   return {
     type: NodeTypes.COMPOUND_EXPRESSION,
     loc,
+    children,
   }
 }
 

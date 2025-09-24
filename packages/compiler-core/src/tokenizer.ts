@@ -492,6 +492,12 @@ export default class Tokenizer {
           break
         }
 
+        // 指令后面可能没有值 还有一个空 比如 <div v-for />
+        case State.AfterAttrName: {
+          this.stateAfterAttrName(c)
+          break
+        }
+
         case State.InAttrName: {
           this.stateInAttrName(c)
           break
