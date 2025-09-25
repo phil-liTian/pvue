@@ -1,5 +1,6 @@
 import { PatchFlags } from '@pvue/shared'
 import { TransformContext } from './transform'
+import type { Node as BabelNode } from '@babel/types'
 
 export enum NodeTypes {
   ROOT,
@@ -78,7 +79,7 @@ export interface InterpolationNode extends Node {
 
 export interface CompoundExpressionNode extends Node {
   type: NodeTypes.COMPOUND_EXPRESSION
-  children: SimpleExpressionNode[]
+  children: (SimpleExpressionNode | string)[]
 }
 
 export interface SlotOutletNode extends BaseElementNode {
@@ -141,6 +142,7 @@ export interface ForNode extends Node {
   objectIndexAlias: undefined | ExpressionNode
   valueAlias: undefined | ExpressionNode
   source: ExpressionNode
+  children: TemplateChildNode[]
 }
 
 export interface CommentNode extends Node {
@@ -170,7 +172,8 @@ export interface SimpleExpressionNode extends Node {
   isStatic: boolean
   constType: ConstantTypes
 
-  ast?: null | false
+  ast?: null | false | BabelNode
+  identifiers?: string[]
 }
 
 // <div :id='foo' />

@@ -17,13 +17,17 @@ import {
 } from './ast'
 import { createCompilerError, defaultOnError, ErrorCodes } from './errors'
 import { ParserOptions } from './options'
+import {
+  type ParserOptions as BabelOptions,
+  parseExpression,
+} from '@babel/parser'
 import Tokenizer, {
   CharCodes,
   isWhitespace,
   QuoteType,
   toCharCodes,
 } from './tokenizer'
-import { forAliasRE } from './utils'
+import { forAliasRE, isSimpleIdentifier } from './utils'
 
 const stack: ElementNode = []
 let currentInput = ''
@@ -56,6 +60,7 @@ export const defaultParserOptions: MergedParserOptions = {
   ns: Namespaces.HTML,
   delimiters: ['{{', '}}'],
   comments: __DEV__,
+  prefixIdentifiers: false,
 }
 
 let currentOptions: MergedParserOptions = defaultParserOptions
@@ -245,6 +250,22 @@ function createExp(
   constType: ConstantTypes = ConstantTypes.NOT_CONSTANT
 ) {
   const exp = createSimpleExpression(content, isStatic, loc, constType)
+
+  if (currentOptions.prefixIdentifiers) {
+    // 是简单标识符 比如a、b 这种， 如果是item in items 这种有空格的字符串则认为不是简单标识符 需要进行ast处理
+    if (isSimpleIdentifier(content)) {
+      exp.ast = null
+      return exp
+    }
+
+    try {
+      const options: BabelOptions = {
+        plugins: ['typescript'],
+      }
+
+      exp.ast = parseExpression(`(${content})`, options)
+    } catch (e) {}
+  }
 
   return exp
 }

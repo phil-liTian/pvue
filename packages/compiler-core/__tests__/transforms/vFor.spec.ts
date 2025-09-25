@@ -7,6 +7,8 @@ import {
   ForNode,
   ForCodegenNode,
   NodeTypes,
+  ElementNode,
+  InterpolationNode,
 } from '../../src/ast'
 import type { CompilerOptions, RootNode } from '../../src/index'
 import { baseParse as parse, transform, ErrorCodes } from '../../src/index'
@@ -14,6 +16,7 @@ import { transformIf } from '../../src/transforms/vIf'
 import { transformFor } from '../../src/transforms/vFor'
 import { transformElement } from '../../src/transforms/transformElement'
 import { transformSlotOutlet } from '../../src/transforms/transformSlotOutlet'
+import { transformExpression } from '../../src/transforms/transformExpression'
 
 export function parseWithForTransform(
   template: string,
@@ -27,7 +30,7 @@ export function parseWithForTransform(
     nodeTransforms: [
       transformIf,
       transformFor,
-      // ...(options.prefixIdentifiers ? [transformExpression] : []),
+      ...(options.prefixIdentifiers ? [transformExpression] : []),
       transformSlotOutlet,
       transformElement,
     ],
@@ -475,7 +478,7 @@ describe('compiler: v-for', () => {
       })
     })
 
-    test.skip('should prefix v-for source w/ complex expression', () => {
+    test('should prefix v-for source w/ complex expression', () => {
       const { node } = parseWithForTransform(
         `<div v-for="i in list.concat([foo])"/>`,
         { prefixIdentifiers: true }
@@ -490,6 +493,23 @@ describe('compiler: v-for', () => {
           { content: `_ctx.foo` },
           `])`,
         ],
+      })
+    })
+
+    test('should not prefix v-for alias', () => {
+      const { node } = parseWithForTransform(
+        `<div v-for="i in list">{{ i }}{{ j }}</div>`,
+        { prefixIdentifiers: true }
+      )
+      const div = node.children[0] as ElementNode
+
+      expect((div.children[0] as InterpolationNode).content).toMatchObject({
+        type: NodeTypes.SIMPLE_EXPRESSION,
+        content: `i`,
+      })
+      expect((div.children[1] as InterpolationNode).content).toMatchObject({
+        type: NodeTypes.SIMPLE_EXPRESSION,
+        content: `_ctx.j`,
       })
     })
   })

@@ -12,6 +12,7 @@ import {
   createVNodeCall,
   DirectiveNode,
   ElementNode,
+  ExpressionNode,
   JSChildNode,
   NodeTypes,
   ParentNode,
@@ -41,6 +42,8 @@ export interface TransformContext extends Required<TransformOptions> {
   onNodeRemoved(): void
   hoist(exp: string | JSChildNode): SimpleExpressionNode
   helper<T extends symbol>(name: T): T
+  addIdentifiers(exp: ExpressionNode | string): void
+  identifiers: { [name: string]: undefined | number }
 }
 
 export type NodeTransform = (
@@ -71,6 +74,7 @@ export function createTransformContext(
     hoists: [],
     helpers: new Map(),
     prefixIdentifiers,
+    identifiers: Object.create(null),
     onError,
 
     onNodeRemoved: NOOP,
@@ -121,6 +125,28 @@ export function createTransformContext(
 
       context.parent?.children.splice(removalIndex, 1)
     },
+
+    addIdentifiers(exp) {
+      if (!__BROWSER__) {
+        console.log('exp', exp)
+
+        if (isString(exp)) {
+        } else if (exp.identifiers) {
+        } else if (exp.type === NodeTypes.SIMPLE_EXPRESSION) {
+          // console.log('exp', exp)
+
+          addId(exp.content)
+        }
+      }
+    },
+  }
+
+  function addId(id: string) {
+    const { identifiers } = context
+    if (identifiers[id] === undefined) {
+      identifiers[id] = 0
+    }
+    identifiers[id]++
   }
 
   return context
@@ -168,6 +194,7 @@ function traverseNode(
     }
 
     case NodeTypes.ELEMENT:
+    case NodeTypes.FOR:
     case NodeTypes.ROOT: {
       traverseChildren(node, context)
       break
@@ -275,6 +302,10 @@ export function createStructuralDirectiveTransform(
       for (let i = 0; i < props.length; i++) {
         const prop = props[i]
         if (matches(prop.name)) {
+          // 匹配完之后 需要删除当前处理过的props, 否则可能导致死循环, 很关键的一点
+          props.splice(i, 1)
+          i--
+
           const onExit = fn(node, prop, context)
           onExit && exitFns.push(onExit)
         }
@@ -284,3 +315,5 @@ export function createStructuralDirectiveTransform(
     }
   }
 }
+
+function addId(id: string) {}

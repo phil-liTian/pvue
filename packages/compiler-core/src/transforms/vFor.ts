@@ -21,7 +21,7 @@ import { processExpression } from './transformExpression'
 export const transformFor: NodeTransform = createStructuralDirectiveTransform(
   'for',
   (node, dir, context) => {
-    processFor(node, dir, context, forNode => {
+    return processFor(node, dir, context, forNode => {
       const isTemplate = isTemplateNode(node)
 
       if (__DEV__ && isTemplate) {
@@ -68,6 +68,7 @@ export function processFor(
       )
       return
     }
+    const { addIdentifiers } = context
 
     finalizeForParseResult(parseResult, context)
 
@@ -79,11 +80,18 @@ export function processFor(
       objectIndexAlias: index,
       source,
       loc: dir.loc,
+      children: [node],
     }
 
     context.replaceNode(forNode)
 
     const onExit = processCodegen && processCodegen(forNode)
+
+    if (context.prefixIdentifiers) {
+      // 比如 <div v-for="i in items" /> 中的 i 会添加到identifiers中, 后续给变量增加_ctx的时候，如果存在在identifiers中的value不会添加_ctx.前缀
+
+      value && addIdentifiers(value)
+    }
 
     return () => {
       onExit && onExit()

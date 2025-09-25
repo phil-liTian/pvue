@@ -30,6 +30,9 @@ export interface ParserOptions extends ErrorHandlingOptions {
   delimiters?: [string, string]
   comments?: boolean
   ns?: Namespace
+
+  // 是有带前缀标识符
+  prefixIdentifiers?: boolean
   getNamespace?: (
     tag: string,
     parent: ElementNode | undefined,
@@ -51,4 +54,4 @@ export interface TransformOptions
   prefixIdentifiers?: boolean
 }
 
-export interface CompilerOptions {}
+export interface CompilerOptions extends ParserOptions {}

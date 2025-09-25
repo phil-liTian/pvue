@@ -56,6 +56,7 @@ export function findProp(node: ElementNode, name: string) {
   }
 }
 
+// 没有空格和特殊字符的字符串 被认为是简单标识符
 const nonIdentifierRE = /^$|^\d|[^\$\w\xA0-\uFFFF]/
 export const isSimpleIdentifier = (name: string): boolean =>
   !nonIdentifierRE.test(name)
