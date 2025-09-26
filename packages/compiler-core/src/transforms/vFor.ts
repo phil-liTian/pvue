@@ -3,6 +3,9 @@
  * @Date: 2025-09-19 10:10:12
  */
 import {
+  createCallExpression,
+  createFunctionExpression,
+  createVNodeCall,
   DirectiveNode,
   ElementNode,
   ForNode,
@@ -17,12 +20,18 @@ import {
   TransformContext,
 } from '../transform'
 import { processExpression } from './transformExpression'
+import { FRAGMENT, RENDER_LIST } from '../runtimeHelpers'
 
 export const transformFor: NodeTransform = createStructuralDirectiveTransform(
   'for',
   (node, dir, context) => {
+    const { helper } = context
     return processFor(node, dir, context, forNode => {
       const isTemplate = isTemplateNode(node)
+
+      const renderExp = createCallExpression(helper(RENDER_LIST), [
+        forNode.source,
+      ]) as any
 
       if (__DEV__ && isTemplate) {
         node.children.some(c => {
@@ -42,7 +51,27 @@ export const transformFor: NodeTransform = createStructuralDirectiveTransform(
         })
       }
 
-      return () => {}
+      forNode.codegenNode = createVNodeCall(
+        context,
+        helper(FRAGMENT),
+        undefined,
+        renderExp /** children */,
+        0,
+        undefined,
+        undefined,
+        true,
+        true /** disableTracking */
+      )
+
+      return () => {
+        renderExp.arguments.push(
+          createFunctionExpression(
+            createForLoopParams(forNode.parseResult),
+            {},
+            true
+          )
+        )
+      }
     })
   }
 )
@@ -80,7 +109,8 @@ export function processFor(
       objectIndexAlias: index,
       source,
       loc: dir.loc,
-      children: [node],
+      children: isTemplateNode(node) ? node.children : [node],
+      parseResult,
     }
 
     context.replaceNode(forNode)
@@ -89,7 +119,6 @@ export function processFor(
 
     if (context.prefixIdentifiers) {
       // 比如 <div v-for="i in items" /> 中的 i 会添加到identifiers中, 后续给变量增加_ctx的时候，如果存在在identifiers中的value不会添加_ctx.前缀
-
       value && addIdentifiers(value)
     }
 
@@ -106,4 +135,17 @@ export function finalizeForParseResult(
   if (!__BROWSER__ && context.prefixIdentifiers) {
     result.source = processExpression(result.source, context)
   }
+}
+
+export function createForLoopParams({ value, key, index }: ForParseResult) {
+  return createParamsList([value, key, index])
+}
+
+function createParamsList(args) {
+  let i = args.length
+  while (i--) {
+    if (args[i]) break
+  }
+
+  return args.slice(0, i + 1).map(arg => arg)
 }

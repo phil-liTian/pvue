@@ -2,6 +2,7 @@ import { isArray, isString, isSymbol, PatchFlagNames } from '@pvue/shared'
 import {
   CallExpression,
   CompoundExpressionNode,
+  FunctionExpression,
   getVNodeBlockHelper,
   getVNodeHelper,
   InterpolationNode,
@@ -64,13 +65,23 @@ function genModulePreamble(ast: RootNode, context: CodegenContext) {
 }
 
 function genFunctionPreamble(ast: RootNode, context: CodegenContext) {
-  const { newline, push, runtimeModuleName, runtimeGlobalName } = context
+  const {
+    newline,
+    push,
+    runtimeModuleName,
+    runtimeGlobalName,
+    prefixIdentifiers,
+  } = context
 
   const VueBinding = runtimeGlobalName
 
   const helpers = Array.from(ast.helpers)
   if (helpers.length) {
-    push(`const _PVue = ${VueBinding}\n`, NewlineType.End)
+    if (prefixIdentifiers) {
+      push(`const { ${helpers.map(aliasHelper)} } = ${VueBinding}\n`)
+    } else {
+      push(`const _PVue = ${VueBinding}\n`, NewlineType.End)
+    }
   }
 
   newline()
@@ -84,6 +95,7 @@ function createCodegenContext(
     mode = 'function',
     runtimeModuleName = 'pvue',
     runtimeGlobalName = 'PVue',
+    prefixIdentifiers,
   }: CodegenOptions
 ): CodegenContext {
   const context: CodegenContext = {
@@ -93,6 +105,7 @@ function createCodegenContext(
     indentLevel: 0,
     runtimeModuleName,
     runtimeGlobalName,
+    prefixIdentifiers,
     push(code) {
       context.code += code
     },
@@ -133,9 +146,9 @@ export function generate(
 ): CodegenResult {
   const context = createCodegenContext(ast, options)
 
-  const { mode, push, indent, deindent, newline } = context
+  const { mode, push, indent, deindent, newline, prefixIdentifiers } = context
 
-  const useWithBlock = mode === 'function'
+  const useWithBlock = mode === 'function' && !prefixIdentifiers
 
   const helpers = Array.from(ast.helpers)
   const hasHelpers = helpers.length > 0
@@ -199,6 +212,14 @@ function genNode(node: CodegenNode, context: CodegenContext) {
   }
 
   switch (node.type) {
+    // 处理for循环
+    // 处理元素节点
+    case NodeTypes.ELEMENT:
+    case NodeTypes.FOR: {
+      genNode(node.codegenNode, context)
+      break
+    }
+
     case NodeTypes.TEXT_CALL: {
       genNode(node.codegenNode, context)
       break
@@ -238,8 +259,9 @@ function genNode(node: CodegenNode, context: CodegenContext) {
       break
     }
 
-    case NodeTypes.ELEMENT: {
-      genNode(node.codegenNode, context)
+    // 处理函数
+    case NodeTypes.JS_FUNCTION_EXPRESSION: {
+      genFunctionExpression(node, context)
       break
     }
   }
@@ -299,11 +321,12 @@ function genVNodeCall(node: VNodeCall, context: CodegenContext) {
     props,
     children,
     dynamicProps,
+    disableTracking,
     patchFlag,
   } = node
 
   if (isBlock) {
-    push(`(${helper(OPEN_BLOCK)}(), `)
+    push(`(${helper(OPEN_BLOCK)}(${disableTracking ? 'true' : ''}), `)
   }
 
   const callHelper: symbol = isBlock
@@ -376,6 +399,39 @@ function genNodeList(
         comma && push(', ')
       }
     }
+  }
+}
+
+// 处理函数
+function genFunctionExpression(
+  node: FunctionExpression,
+  context: CodegenContext
+) {
+  const { push, indent, deindent } = context
+  const { params, newline, returns } = node
+
+  push('(')
+  console.log('parase', params)
+  if (isArray(params)) {
+    genNodeList(params, context)
+  }
+
+  push(') => ')
+
+  if (newline) {
+    push('{')
+    indent()
+  }
+
+  if (returns) {
+    if (newline) {
+      push('return ')
+    }
+  }
+
+  if (newline) {
+    deindent()
+    push('}')
   }
 }
 

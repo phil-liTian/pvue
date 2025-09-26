@@ -14,6 +14,7 @@ export interface CodegenOptions {
   runtimeModuleName?: string
 
   runtimeGlobalName?: string
+  prefixIdentifiers?: boolean
 }
 
 export interface ErrorHandlingOptions {

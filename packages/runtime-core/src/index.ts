@@ -11,6 +11,7 @@ export {
   isVNode,
   openBlock,
   createBlock,
+  createElementBlock,
   type VNode,
   Fragment,
 } from './vnode'

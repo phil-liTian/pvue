@@ -6,6 +6,7 @@ import { PatchFlagNames, PatchFlags } from '@pvue/shared'
 import {
   CallExpression,
   CompoundExpressionNode,
+  ConstantTypes,
   createCallExpression,
   createCompoundExpression,
   NodeTypes,
@@ -13,9 +14,10 @@ import {
 import { CREATE_TEXT } from '../runtimeHelpers'
 import { NodeTransform } from '../transform'
 import { isText } from '../utils'
+import { getConstantType } from './cacheStatic'
 
 export const transformText: NodeTransform = (node, context) => {
-  if (node.type === NodeTypes.ROOT) {
+  if (node.type === NodeTypes.ROOT || node.type === NodeTypes.FOR) {
     return () => {
       const children = node.children
 
@@ -37,6 +39,10 @@ export const transformText: NodeTransform = (node, context) => {
 
               children.splice(j, 1)
               j--
+            } else {
+              // 如果next不是 text类型的 则需要当作下一个children处理, 进入下一次i循环
+              currentContainer = undefined
+              break
             }
           }
         }
@@ -54,14 +60,16 @@ export const transformText: NodeTransform = (node, context) => {
         if (isText(child) || child.type === NodeTypes.COMPOUND_EXPRESSION) {
           let callArgs: CallExpression['arguments'] = []
 
-          if (child.type !== NodeTypes.TEXT) {
+          if (child.type !== NodeTypes.TEXT || child.content !== ' ') {
             callArgs.push(child)
           }
 
-          callArgs.push(
-            PatchFlags.TEXT +
-              (__DEV__ ? ` /* ${PatchFlagNames[PatchFlags.TEXT]} */` : '')
-          )
+          if (getConstantType(child, context) === ConstantTypes.NOT_CONSTANT) {
+            callArgs.push(
+              PatchFlags.TEXT +
+                (__DEV__ ? ` /* ${PatchFlagNames[PatchFlags.TEXT]} */` : '')
+            )
+          }
 
           children[i] = {
             type: NodeTypes.TEXT_CALL,

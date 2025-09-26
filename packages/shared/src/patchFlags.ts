@@ -23,6 +23,22 @@
 //   BAIL = -2,
 // }
 
+// patchFlag 是一个数字枚举，不同的数值代表不同类型的动态内容，例如：
+// 1 /* TEXT */：节点的文本内容是动态的（如 {{ msg }}）。
+// 2 /* CLASS */：节点的 class 属性是动态的（如 :class="cls"）。
+// 4 /* STYLE */：节点的 style 属性是动态的（如 :style="sty"）。
+// 8 /* PROPS */：节点的普通属性是动态的（如 :id="uid"），需配合 dynamicProps 说明具体哪些属性动态。
+// 16 /* FULL_PROPS */：节点有动态的 props（如使用 v-bind="obj" 绑定多个属性）。
+// 32 /* HYDRATE_EVENTS */：节点需要在服务端渲染（SSR）时激活事件。
+// 64 /* STABLE_FRAGMENT */：片段（Fragment）的子节点顺序固定。
+// 128 /* KEYED_FRAGMENT */：片段的子节点有 key，需按 key 对比。
+// 256 /* UNKEYED_FRAGMENT */：片段的子节点无 key，需按索引对比。
+// 512 /* NEED_PATCH */：节点有动态内容，但无法被上面的类型精确标记（需全量对比）。
+
+// 在组件更新时，Vue3 的 diff 算法会读取 VNode 的 patchFlag：
+// 如果节点没有 patchFlag（静态节点），则直接跳过对比，无需更新。
+// 如果节点有 patchFlag，则只针对标记的动态部分进行对比和更新（例如，TEXT 标记的节点只对比文本内容，CLASS 标记的节点只对比 class 属性）。
+
 export enum PatchFlags {
   /**
    * Indicates an element with dynamic textContent (children fast path)
@@ -121,11 +137,11 @@ export enum PatchFlags {
    */
   CACHED = -1,
   /**
-   * A special flag that indicates that the diffing algorithm should bail out
-   * of optimized mode. For example, on block fragments created by renderSlot()
-   * when encountering non-compiler generated slots (i.e. manually written
-   * render functions, which should always be fully diffed)
-   * OR manually cloneVNodes
+   * 一个特殊的标志，表示差异比较算法应该退出优化模式。
+   * 例如，在遇到由 renderSlot() 创建的块级片段时，
+   * 如果遇到非编译器生成的插槽（即手动编写的渲染函数，
+   * 这些函数应该始终进行完整的差异比较）
+   * 或手动克隆的虚拟节点时
    */
   BAIL = -2,
 }
@@ -146,3 +162,11 @@ export const PatchFlagNames: Record<PatchFlags, string> = {
   [PatchFlags.CACHED]: `CACHED`,
   [PatchFlags.BAIL]: `BAIL`,
 }
+
+// <template>
+//   <div class="static-class">
+//     <p>静态文本</p>
+//     <p>{{ dynamicText }}</p>
+//     <button :style="dynamicStyle">按钮</button>
+//   </div>
+// </template>

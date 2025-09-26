@@ -206,6 +206,7 @@ function createBaseVNode(
     appContext: null,
     component: null,
   } as VNode
+
   if (needFullChildrenNormalization) {
     normalizeChildren(vnode, children)
   } else if (children) {
@@ -333,4 +334,15 @@ export function transformVNodeArgs() {
 
 export function isSameVNodeType(n1: VNode, n2: VNode): Boolean {
   return n1.type === n2.type && n1.key === n2.key
+}
+
+export function createElementBlock(
+  type: string | typeof Fragment,
+  props?: Record<string, any> | null,
+  children?: any,
+  patchFlag?: number,
+  dynamicProps?: string[],
+  shapeFlag?: number
+) {
+  return createBaseVNode(type, props, children, patchFlag, shapeFlag, true)
 }

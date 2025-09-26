@@ -29,6 +29,7 @@ export enum NodeTypes {
   VNODE_CALL,
   JS_CALL_EXPRESSION,
   JS_ARRAY_EXPRESSION,
+  JS_FUNCTION_EXPRESSION,
 }
 
 export enum ConstantTypes {
@@ -124,6 +125,13 @@ export interface ArrayExpression extends Node {
   elements: Array<string | Node>
 }
 
+export interface FunctionExpression extends Node {
+  type: NodeTypes.JS_FUNCTION_EXPRESSION
+  params: ExpressionNode | string | undefined
+  returns?: TemplateChildNode
+  newline?: boolean
+}
+
 export type ExpressionNode = SimpleExpressionNode
 
 export type JSChildNode = ExpressionNode
@@ -154,6 +162,8 @@ export interface ForNode extends Node {
   valueAlias: undefined | ExpressionNode
   source: ExpressionNode
   children: TemplateChildNode[]
+  codegenNode?: ForCodegenNode
+  parseResult: ForParseResult
 }
 
 export interface CommentNode extends Node {
@@ -274,6 +284,7 @@ export function createVNodeCall(
     dynamicProps,
     directives,
     isBlock,
+    disableTracking,
   }
 }
 
@@ -293,6 +304,21 @@ export function createArrayExpression(elements: ArrayExpression['elements']) {
   return {
     type: NodeTypes.JS_ARRAY_EXPRESSION,
     elements,
+  }
+}
+
+// 创建函数表达式 例如 <div v-for="item in list" /> 中 就需要创建renderList这个函数
+
+export function createFunctionExpression(
+  params: FunctionExpression['params'],
+  returns: FunctionExpression['returns'] = undefined,
+  newline: boolean = false
+) {
+  return {
+    type: NodeTypes.JS_FUNCTION_EXPRESSION,
+    params,
+    returns,
+    newline,
   }
 }
 

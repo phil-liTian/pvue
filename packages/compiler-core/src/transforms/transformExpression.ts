@@ -3,6 +3,7 @@
  * @Date: 2025-09-23 19:50:11
  */
 import { Identifier } from '@babel/types'
+import { parseExpression } from '@babel/parser'
 import {
   CompoundExpressionNode,
   ConstantTypes,
@@ -33,7 +34,7 @@ export function processExpression(
   node: SimpleExpressionNode,
   context: TransformContext
 ) {
-  const ast = node.ast
+  let ast = node.ast
 
   const rewriteIdentifier = (raw: string) => {
     return `_ctx.${raw}`
@@ -48,9 +49,17 @@ export function processExpression(
     if (!isScopeVarReference) {
       node.content = rewriteIdentifier(rawExp)
     }
+    return node
   }
 
-  if (!ast) return node
+  if (!ast) {
+    try {
+      const source = `(${rawExp})`
+      ast = parseExpression(source)
+    } catch (e) {
+      return node
+    }
+  }
 
   type QualifiedId = Identifier & PrefixMeta
   const ids: QualifiedId[] = []

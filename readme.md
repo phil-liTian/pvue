@@ -390,6 +390,21 @@ export function finishComponentSetup(
 }
 ```
 
+核心点 4: 优化项: patchFlag、静态提升、树结构打平
+
+patchFlag: 的核心思想是 **“编译时标记动态内容，运行时精准更新”**，通过减少 diff 过程中不必要的对比，从根源上优化了虚拟 DOM 的更新性能。
+
+在组件更新时，Vue3 的 diff 算法会读取 VNode 的 patchFlag：
+如果节点没有 patchFlag（静态节点），则直接跳过对比，无需更新。
+如果节点有 patchFlag，则只针对标记的动态部分进行对比和更新（例如，TEXT 标记的节点只对比文本内容，CLASS 标记的节点只对比 class 属性）。
+
+静态提升：将静态节点 / 属性提升到渲染函数外，避免每次渲染重新创建。
+
+树结构打平：将嵌套的静态节点合并为一个 “块”（Block），进一步减少 diff 层级。
+openBlock 是编译时优化与虚拟 DOM（VNode）更新机制的核心函数之一，它的主要作用是创建一个 “块”（Block）上下文，用于收集动态节点信息，为后续的高效 diff 算法提供基础
+“块” 是 Vue3 引入的一种虚拟 DOM 优化结构，本质上是一个包含动态节点索引的 VNode 集合。
+openblock 开启一个 Block 上下文;Vue3 的模板编译器将模板编译为渲染函数时，会在生成动态节点的代码前调用 openBlock()
+
 #### transform
 
 1. vFor 核心注意事项总结
@@ -404,7 +419,7 @@ export function finishComponentSetup(
 ```
 
 这里 i 是 forNode 的 value，不需要加 ctx, j 是普通插值需要加 ctx
-1.3 对于复杂表达式, 如下：
+1.3 对于复杂表达式({{ bar + foo }}), 如下：
 
 ```js
 <div v-for="i in list.concat([foo])" />

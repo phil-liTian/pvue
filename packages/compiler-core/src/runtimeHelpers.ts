@@ -14,6 +14,7 @@ export const CREATE_ELEMENT_VNODE: unique symbol = Symbol('createElementVNode')
 export const OPEN_BLOCK: unique symbol = Symbol('openBlock')
 export const CREATE_BLOCK: unique symbol = Symbol('createBlock')
 export const CREATE_ELEMENT_BLOCK: unique symbol = Symbol('createElementBlock')
+export const RENDER_LIST: unique symbol = Symbol('renderList')
 
 export const helperNameMap: Record<symbol, string> = {
   [CREATE_VNODE]: `createVNode`,
@@ -25,4 +26,5 @@ export const helperNameMap: Record<symbol, string> = {
   [OPEN_BLOCK]: 'openBlock',
   [CREATE_BLOCK]: 'createBlock',
   [CREATE_ELEMENT_BLOCK]: 'createElementBlock',
+  [RENDER_LIST]: 'renderList',
 }
