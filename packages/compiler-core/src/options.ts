@@ -12,6 +12,8 @@ export interface CodegenOptions {
    * @default pvue
    */
   runtimeModuleName?: string
+
+  runtimeGlobalName?: string
 }
 
 export interface ErrorHandlingOptions {

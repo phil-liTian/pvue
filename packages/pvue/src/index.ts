@@ -4,14 +4,14 @@ import * as runtimeDom from '@pvue/runtime-dom'
 
 function compileToFunction(template: string | HTMLElement) {
   const { code } = compile(template as string)
-  console.log(code)
 
   // 只需要保留函数体中的内容
-  const funcBody = code.replace(/^function\s+\w*\([^)]*\)\s*\{|\}$/g, '').trim()
+  // const funcBody = code.replace(/^function\s+\w*\([^)]*\)\s*\{|\}$/g, '').trim()
 
-  const render = new Function('PVue', funcBody)
+  const render = new Function('PVue', code)(runtimeDom)
 
-  // return render
+  console.log('render', render)
+
   return render
 }
 

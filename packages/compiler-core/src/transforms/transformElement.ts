@@ -46,6 +46,9 @@ export const transformElement: NodeTransform = (node, context) => {
     let vnodeDynamicProps: VNodeCall['dynamicProps']
     let vnodeDirectives: VNodeCall['directives']
 
+    // 判断是否需要block辅助方法
+    let shouldUseBlock = false
+
     // children
     if (node.children.length) {
       vnodeChildren = node.children
@@ -71,7 +74,8 @@ export const transformElement: NodeTransform = (node, context) => {
       vnodeChildren,
       patchFlag,
       vnodeDynamicProps,
-      vnodeDirectives
+      vnodeDirectives,
+      !!shouldUseBlock
     )
   }
 }

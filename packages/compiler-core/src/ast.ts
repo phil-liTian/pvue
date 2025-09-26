@@ -1,6 +1,13 @@
 import { PatchFlags } from '@pvue/shared'
 import { TransformContext } from './transform'
 import type { Node as BabelNode } from '@babel/types'
+import {
+  CREATE_BLOCK,
+  CREATE_ELEMENT_BLOCK,
+  CREATE_ELEMENT_VNODE,
+  CREATE_VNODE,
+  OPEN_BLOCK,
+} from './runtimeHelpers'
 
 export enum NodeTypes {
   ROOT,
@@ -16,6 +23,7 @@ export enum NodeTypes {
   IF,
   FOR,
   COMPOUND_EXPRESSION,
+  TEXT_CALL,
 
   // codegen
   VNODE_CALL,
@@ -79,7 +87,7 @@ export interface InterpolationNode extends Node {
 
 export interface CompoundExpressionNode extends Node {
   type: NodeTypes.COMPOUND_EXPRESSION
-  children: (SimpleExpressionNode | string)[]
+  children: (SimpleExpressionNode | string | TextNode | InterpolationNode)[]
 }
 
 export interface SlotOutletNode extends BaseElementNode {
@@ -99,6 +107,8 @@ export interface VNodeCall extends Node {
   dynamicProps: string | undefined
   directives: undefined | DirectiveNode
   isBlock: boolean
+  disableTracking: boolean
+  isComponent: boolean
 }
 
 export interface ForCodegenNode extends VNodeCall {}
@@ -106,6 +116,7 @@ export interface ForCodegenNode extends VNodeCall {}
 export interface CallExpression extends Node {
   type: NodeTypes.JS_CALL_EXPRESSION
   callee: string | symbol
+  arguments: TemplateChildNode[]
 }
 
 export interface ArrayExpression extends Node {
@@ -241,8 +252,19 @@ export function createVNodeCall(
   patchFlag?: VNodeCall['patchFlag'],
   dynamicProps?: VNodeCall['dynamicProps'],
   directives?: VNodeCall['directives'],
-  isBlock: VNodeCall['isBlock'] = false
+  isBlock: VNodeCall['isBlock'] = false,
+  disableTracking: VNodeCall['disableTracking'] = false,
+  isComponent: VNodeCall['isComponent'] = false
 ) {
+  if (context) {
+    if (isBlock) {
+      context.helper(OPEN_BLOCK)
+      context.helper(getVNodeBlockHelper(isComponent))
+    } else {
+      context.helper(getVNodeHelper(isComponent))
+    }
+  }
+
   return {
     type: NodeTypes.VNODE_CALL,
     tag,
@@ -257,11 +279,13 @@ export function createVNodeCall(
 
 // 创建一个JS_CALL类型的对象
 export function createCallExpression<T extends CallExpression['callee']>(
-  callee: T
+  callee: T,
+  args
 ) {
   return {
     type: NodeTypes.JS_CALL_EXPRESSION,
     callee,
+    arguments: args,
   }
 }
 
@@ -289,4 +313,17 @@ export function convertToBlock(node: VNodeCall, {}: TransformContext) {
   if (!node.isBlock) {
     node.isBlock = true
   }
+}
+
+/**
+ * 根据是否为组件返回对应的VNode创建辅助函数
+ * @param isComponent 是否为组件
+ * @returns 相应的VNode创建函数标识符
+ */
+export function getVNodeHelper(isComponent) {
+  return isComponent ? CREATE_VNODE : CREATE_ELEMENT_VNODE
+}
+
+export function getVNodeBlockHelper(isComponent) {
+  return isComponent ? CREATE_BLOCK : CREATE_ELEMENT_BLOCK
 }

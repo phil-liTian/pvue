@@ -528,6 +528,7 @@ export function baseParse(input: string, options?: ParserOptions): RootNode {
 
   // 根元素需要记录整个input的开始位置、结束位置以及source的内容
   root.loc = getLoc(0, currentInput.length)
+
   return root
 }
 

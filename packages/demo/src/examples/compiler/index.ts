@@ -1,6 +1,3 @@
-import {} from 'pvue'
+import { CompilerText } from './text'
 
-export const Compiler = {
-  name: 'Compiler',
-  template: 'compiler-core',
-}
+export const Compiler = CompilerText

@@ -330,11 +330,12 @@ function compileToFunction(template: string | HTMLElement) {
   const { code } = compile(template as string)
 
   // 只需要保留函数体中的内容
-  const funcBody = code.replace(/^function\s+\w*\([^)]*\)\s*\{|\}$/g, '').trim()
+  // const funcBody = code.replace(/^function\s+\w*\([^)]*\)\s*\{|\}$/g, '').trim()
 
-  const render = new Function('PVue', funcBody)
+  // const render = new Function('PVue', funcBody)
 
-  // return render
+  const render = new Function('PVue', code)(runtimeDom)
+
   return render
 }
 
@@ -388,3 +389,31 @@ export function finishComponentSetup(
   // ...
 }
 ```
+
+#### transform
+
+1. vFor 核心注意事项总结
+   1.1 props 注意去掉
+   1.2 Identifiers 用来区分哪些节点需要加 ctx, 哪些节点不需要。例如
+
+```js
+<div v-for="i in list">
+  {{ i }}
+  {{ j }}
+</div>
+```
+
+这里 i 是 forNode 的 value，不需要加 ctx, j 是普通插值需要加 ctx
+1.3 对于复杂表达式, 如下：
+
+```js
+<div v-for="i in list.concat([foo])" />
+```
+
+需要对`list.concat([foo])`在 parser 时使用@babel/parser 转换成 ast，然后在 vFor 中使用 estree-walker 的 walk 方法进行遍历 ast 中的 node 节点
+
+2. transformText: 处理文本节点
+   2.1 如果是多根节点, 每个 children 都是一个 Text 类型的节点，则组合成一个 COMPOUND_EXPRESSION 类型的节点
+   2.2 如果多根节点中的 children 有非 Text 类型的节点, 就将这个非 text 类型的节点转换成 TEXT_CALL 类型的节点
+
+tips: 目前创建 VNODE_CALL 类型的节点有 Element、多根节点 Fragement

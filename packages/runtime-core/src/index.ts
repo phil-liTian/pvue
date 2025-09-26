@@ -58,3 +58,5 @@ export {
 } from './scheduler'
 
 export { registerRuntimeCompiler } from './component'
+
+export { toDisplayString } from '@pvue/shared'

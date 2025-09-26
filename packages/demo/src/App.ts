@@ -14,6 +14,7 @@ import { ApiWatch } from './examples/apiWatch'
 import { Compiler } from './examples/compiler/index'
 
 export const App = {
+  name: 'App',
   render() {
     return h(Compiler)
   },

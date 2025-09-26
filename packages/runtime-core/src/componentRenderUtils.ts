@@ -36,6 +36,7 @@ export function renderComponentRoot(
     if (vnode.shapeFlag & ShapeFlags.STATEFUL_COMPONENT) {
       // 对象组件
       const proxyToUse = proxy
+
       const thisProxy = __DEV__
         ? new Proxy(proxyToUse!, {
             get(target, key, receiver) {
@@ -50,7 +51,7 @@ export function renderComponentRoot(
           })
         : proxyToUse
 
-      result = normalizeVNode(render?.call(thisProxy))
+      result = normalizeVNode(render?.call(thisProxy, proxyToUse))
       fallthroughAttrs = attrs
     } else {
       // 函数组件
@@ -59,6 +60,7 @@ export function renderComponentRoot(
       result = normalizeVNode(render(props, { attrs, slots, emit }))
     }
   } catch (err) {
+    console.log('err', err)
     handleError(err, instance, ErrorCodes.RENDER_FUNCTION)
     result = normalizeVNode(Comment)
   }

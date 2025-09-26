@@ -163,6 +163,7 @@ function traverseNode(
 ) {
   context.currentNode = node
   const { nodeTransforms } = context
+
   let exitFns: (() => void)[] = []
   for (let i = 0; i < nodeTransforms.length; i++) {
     const onExit = nodeTransforms[i](node, context)
@@ -257,7 +258,7 @@ function createRootCodegen(root: RootNode, context: TransformContext) {
       patchFlag |= PatchFlags.DEV_ROOT_FRAGMENT
     }
 
-    //  多根节点
+    //  多根节点, 创建一个VNODE_CALL类型的节点
     root.codegenNode = createVNodeCall(
       context,
       helper(FRAGMENT),
@@ -275,6 +276,7 @@ function createRootCodegen(root: RootNode, context: TransformContext) {
 
 export function transform(root: RootNode, options: TransformOptions) {
   const context = createTransformContext(root, options)
+
   traverseNode(root, context)
   // 给root挂上codegenNode, 用到codegen函数中生成render函数
   createRootCodegen(root, context)

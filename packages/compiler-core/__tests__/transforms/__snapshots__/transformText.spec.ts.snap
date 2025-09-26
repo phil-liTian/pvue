@@ -1,0 +1,41 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`compiler: transform text > consecutive text 1`] = `
+"const _PVue = PVue
+
+return function render(_ctx, _cache) {
+  with (_ctx) {
+    const { toDisplayString: _toDisplayString } = _PVue
+
+    return _toDisplayString(foo) + " bar " + _toDisplayString(baz)
+  }
+}"
+`;
+
+exports[`compiler: transform text > consecutive text between elements 1`] = `
+"const _PVue = PVue
+
+return function render(_ctx, _cache) {
+  with (_ctx) {
+    const { createElementVNode: _createElementVNode, toDisplayString: _toDisplayString, createTextVNode: _createTextVNode, Fragment: _Fragment, openBlock: _openBlock, createElementBlock: _createElementBlock } = _PVue
+
+    return (_openBlock(), _createElementBlock(_Fragment, null, [
+      _createElementVNode("div"),
+      _createTextVNode(_toDisplayString(foo) + " bar " + _toDisplayString(baz), 1 /* TEXT */),
+      _createElementVNode("div")
+    ], 64 /* STABLE_FRAGMENT */))
+  }
+}"
+`;
+
+exports[`compiler: transform text > no consecutive text 1`] = `
+"const _PVue = PVue
+
+return function render(_ctx, _cache) {
+  with (_ctx) {
+    const { toDisplayString: _toDisplayString } = _PVue
+
+    return _toDisplayString(foo)
+  }
+}"
+`;
